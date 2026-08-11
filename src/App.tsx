@@ -5,7 +5,6 @@ import { Navbar } from './components/Navbar';
 import { ClaimantDashboard } from './components/Claimant/ClaimantDashboard';
 import { AgentDashboard } from './components/Agent/AgentDashboard';
 import { AdminDashboard } from './components/Admin/AdminDashboard';
-import { SupabaseModal } from './components/SupabaseModal';
 import { NewClaimWizard } from './components/Claimant/NewClaimWizard';
 import { AuthModal } from './components/Auth/AuthModal';
 import { getStoredClaims, saveStoredClaim, updateStoredClaimStatus, getSupabaseCredentials, getSupabaseClient } from './lib/supabase';
@@ -15,7 +14,6 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('claimant');
   const [insuranceFilter, setInsuranceFilter] = useState<InsuranceType | 'all'>('all');
   const [claims, setClaims] = useState<ClaimRecord[]>([]);
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isNewClaimOpen, setIsNewClaimOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
@@ -241,10 +239,8 @@ export default function App() {
         selectedInsuranceTypeFilter={insuranceFilter}
         onFilterChange={setInsuranceFilter}
         onOpenNewClaim={() => setIsNewClaimOpen(true)}
-        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         currentUser={currentUser}
-        isSupabaseConnected={isSupabaseConnected}
         claimsCountByLine={claimsCountByLine}
         totalClaimsCount={claims.length}
         isMobileOpen={isMobileSidebarOpen}
@@ -259,11 +255,9 @@ export default function App() {
           currentRole={currentRole}
           onRoleChange={setCurrentRole}
           onOpenNewClaim={() => setIsNewClaimOpen(true)}
-          onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           currentUser={currentUser}
           selectedInsuranceTypeFilter={insuranceFilter}
-          isSupabaseConnected={isSupabaseConnected}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
         />
 
@@ -305,15 +299,7 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* Supabase Config Modal */}
-      <SupabaseModal
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
-        onCredentialsUpdated={() => {
-          const creds = getSupabaseCredentials();
-          setIsSupabaseConnected(!!creds.url && !!creds.key && creds.url !== 'MY_SUPABASE_URL');
-        }}
-      />
+
 
       {/* New Claim Intake Wizard */}
       <NewClaimWizard

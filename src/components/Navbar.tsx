@@ -7,11 +7,9 @@ interface HeaderTopBarProps {
   currentRole: UserRole;
   onRoleChange: (role: UserRole) => void;
   onOpenNewClaim: () => void;
-  onOpenSupabaseModal: () => void;
   onOpenAuthModal: () => void;
   currentUser: UserProfile | null;
   selectedInsuranceTypeFilter: InsuranceType | 'all';
-  isSupabaseConnected: boolean;
   onOpenMobileMenu: () => void;
 }
 
@@ -19,11 +17,9 @@ export const Navbar: React.FC<HeaderTopBarProps> = ({
   currentRole,
   onRoleChange,
   onOpenNewClaim,
-  onOpenSupabaseModal,
   onOpenAuthModal,
   currentUser,
   selectedInsuranceTypeFilter,
-  isSupabaseConnected,
   onOpenMobileMenu
 }) => {
   const activeLineTitle = selectedInsuranceTypeFilter === 'all'
@@ -62,20 +58,7 @@ export const Navbar: React.FC<HeaderTopBarProps> = ({
           {/* Right: Actions & Role Pill */}
           <div className="flex items-center space-x-2.5 sm:space-x-3">
             
-            {/* Database Button */}
-            <button
-              onClick={onOpenSupabaseModal}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all ${
-                isSupabaseConnected
-                  ? 'bg-[#FFE1AF]/50 border-[#E2B59A] text-[#8F6218] hover:bg-[#FFE1AF]'
-                  : 'bg-[#FAF7F2] border-[#E2B59A]/60 text-[#957C62] hover:bg-[#FFE1AF]/20'
-              }`}
-            >
-              <Database className={`w-4 h-4 ${isSupabaseConnected ? 'text-[#B77466]' : 'text-[#957C62]'}`} />
-              <span className="hidden sm:inline">
-                {isSupabaseConnected ? 'Supabase Connected' : 'Supabase Setup'}
-              </span>
-            </button>
+
 
             {/* Quick Role Switcher */}
             <div className="flex items-center bg-[#FAF7F2] p-1 rounded-xl border border-[#E2B59A]/60">

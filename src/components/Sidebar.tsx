@@ -26,10 +26,8 @@ interface SidebarProps {
   selectedInsuranceTypeFilter: InsuranceType | 'all';
   onFilterChange: (type: InsuranceType | 'all') => void;
   onOpenNewClaim: () => void;
-  onOpenSupabaseModal: () => void;
   onOpenAuthModal: () => void;
   currentUser: UserProfile | null;
-  isSupabaseConnected: boolean;
   claimsCountByLine: Record<string, number>;
   totalClaimsCount: number;
   isMobileOpen?: boolean;
@@ -52,10 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   selectedInsuranceTypeFilter,
   onFilterChange,
   onOpenNewClaim,
-  onOpenSupabaseModal,
   onOpenAuthModal,
   currentUser,
-  isSupabaseConnected,
   claimsCountByLine,
   totalClaimsCount,
   isMobileOpen = false,
@@ -273,21 +269,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Footer Widgets */}
       <div className="p-4 border-t border-[#E2B59A]/30 bg-[#FAF7F2] space-y-3">
         
-        {/* Supabase Status Button */}
-        <button
-          onClick={onOpenSupabaseModal}
-          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
-            isSupabaseConnected
-              ? 'bg-[#FFE1AF]/50 border-[#E2B59A] text-[#8F6218] hover:bg-[#FFE1AF]'
-              : 'bg-white border-[#E2B59A]/60 text-[#957C62] hover:bg-[#FAF7F2]'
-          }`}
-        >
-          <div className="flex items-center space-x-2">
-            <Database className={`w-4 h-4 ${isSupabaseConnected ? 'text-[#B77466]' : 'text-[#957C62]'}`} />
-            <span>{isSupabaseConnected ? 'Supabase Connected' : 'Connect Supabase'}</span>
-          </div>
-          <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-        </button>
+
 
         {/* User Profile Card */}
         <button
