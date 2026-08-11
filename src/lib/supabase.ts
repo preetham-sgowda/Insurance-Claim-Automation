@@ -21,7 +21,15 @@ let supabaseInstance: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient | null {
   const { url, key } = getSupabaseCredentials();
-  if (!url || !key || url === 'MY_SUPABASE_URL') {
+  if (
+    !url ||
+    !key ||
+    url === 'MY_SUPABASE_URL' ||
+    url.includes('your-project') ||
+    url.includes('your-project-id') ||
+    key.includes('your-anon-key') ||
+    key.includes('your-key-here')
+  ) {
     return null;
   }
   if (!supabaseInstance) {

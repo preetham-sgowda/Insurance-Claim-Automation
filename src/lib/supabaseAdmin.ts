@@ -19,23 +19,21 @@ function getAdminClient(): SupabaseClient {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!isSupabaseConfigured()) {
     if (!_initWarned) {
       console.warn(
-        '⚠️  SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. ' +
-        'Server-side Supabase operations will fail. ' +
-        'Set these in your .env file.'
+        '⚠️  Supabase is not configured (or is using placeholder values in .env). ' +
+        'Server-side Supabase operations will fail and fallback locally. ' +
+        'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env file.'
       );
       _initWarned = true;
     }
-    // Return a dummy client that will fail on actual operations
-    // but won't crash at module-load time
     throw new Error(
       'Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env file.'
     );
   }
 
-  _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  _supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -63,5 +61,12 @@ export const supabaseAdmin = new Proxy({} as SupabaseClient, {
 });
 
 export function isSupabaseConfigured(): boolean {
-  return !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) return false;
+  if (url.includes('your-project') || url.includes('your-project-id') || url === 'MY_SUPABASE_URL') return false;
+  if (key.includes('your-service-role') || key.includes('your-key-here')) return false;
+
+  return true;
 }
