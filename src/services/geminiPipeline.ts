@@ -39,7 +39,27 @@ export interface ProcessingInput {
   claimantName: string;
   claimantEmail: string;
   claimedAmount: number;
-  files: { name: string; size: number; type: string; contentText?: string; base64?: string }[];
+  files: {
+    name: string;
+    size: number;
+    type: string;
+    /** Real extracted text from document (PDF parse or OCR) */
+    extractedText?: string;
+    /** Extraction confidence 0-1 */
+    extractionConfidence?: number;
+    /** How text was extracted: 'pdf_text_layer' | 'ocr' | 'unsupported' */
+    extractionMethod?: string;
+    /** Real Supabase Storage URL */
+    storageUrl?: string;
+    /** Whether document content validation passed */
+    validationPassed?: boolean;
+    /** Document validation failure reason */
+    validationReason?: string;
+    /** Extraction error if any */
+    extractionError?: string;
+    /** Legacy field — kept for backward compat but not used */
+    contentText?: string;
+  }[];
 }
 
 export async function runAIClaimPipeline(input: ProcessingInput): Promise<ClaimRecord> {
@@ -53,6 +73,14 @@ export async function runAIClaimPipeline(input: ProcessingInput): Promise<ClaimR
 
   let status: ClaimStatus = 'submitted';
   if (missingRequiredDocs.length > 2) {
+    status = 'failed_ocr';
+  }
+
+  // Check for extraction failures — if any required doc has very low confidence, flag it
+  const extractionFailures = input.files.filter(
+    f => f.extractionConfidence !== undefined && f.extractionConfidence < 0.15
+  );
+  if (extractionFailures.length > 0 && status !== 'failed_ocr') {
     status = 'failed_ocr';
   }
 
@@ -74,8 +102,15 @@ Claimed Amount: ₹${input.claimedAmount}.
 Policy Number: ${input.policyNumber}.
 Claimant Name: ${input.claimantName}.
 
-Files Attached:
-${input.files.map(f => `- ${f.name} (Text snippet: ${f.contentText || 'Standard insurance document'})`).join('\n')}
+Documents Attached (with real extracted text):
+${input.files.map(f => {
+  const text = f.extractedText || f.contentText || '';
+  const method = f.extractionMethod || 'unknown';
+  const confidence = f.extractionConfidence !== undefined ? `${Math.round(f.extractionConfidence * 100)}%` : 'N/A';
+  const textPreview = text.length > 2000 ? text.substring(0, 2000) + '... [truncated]' : text;
+  return `- ${f.name} (Extraction: ${method}, Confidence: ${confidence})
+  Content: ${textPreview || 'No text extracted'}`;
+}).join('\n')}
 
 Extract key values for this ${input.insuranceType} claim in valid JSON format.
 Include fields relevant to ${input.insuranceType}:
@@ -256,6 +291,22 @@ Include fields relevant to ${input.insuranceType}:
     });
   }
 
+  // Document content validation fraud signals
+  for (const file of input.files) {
+    if (file.validationPassed === false && file.validationReason) {
+      fraudSignals.push({
+        id: `fs-doc-validation-${file.name.replace(/[^a-z0-9]/gi, '_')}`,
+        category: 'base',
+        signalName: 'Document Content Mismatch',
+        severity: 'medium',
+        description: file.validationReason,
+        passed: false,
+        scoreImpact: 15
+      });
+      fraudScore += 15;
+    }
+  }
+
   const isFraudFlagged = fraudScore >= 35;
 
   // 5. CLAIM ESTIMATOR (STRATEGY PATTERN)
@@ -427,7 +478,8 @@ Include fields relevant to ${input.insuranceType}:
       fileName: f.name,
       fileSize: f.size,
       mimeType: f.type,
-      storageUrl: `https://supabase.storage/claimx/${claimId}/${f.name}`,
+      storageUrl: f.storageUrl || `storage://claim-documents/pending/${claimId}/${f.name}`,
+      ocrText: f.extractedText?.substring(0, 500),
       uploadedAt: new Date().toISOString()
     })),
     createdAt: new Date().toISOString(),

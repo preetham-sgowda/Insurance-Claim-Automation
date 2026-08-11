@@ -3,13 +3,18 @@ import { InsuranceType, ClaimSubType, ClaimRecord, formatINR } from '../../types
 import { INSURANCE_TYPES_CONFIG } from '../../data/insuranceConfig';
 import { getStoredPolicies } from '../../lib/supabase';
 import { generateClaimPDFReport } from '../../lib/pdfGenerator';
+import { apiFetch } from '../../lib/apiClient';
 import {
   UploadCloud,
   CheckCircle,
   ChevronRight,
   ArrowLeft,
   Sparkles,
-  Download
+  Download,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  FileText
 } from 'lucide-react';
 
 interface NewClaimWizardProps {
@@ -33,12 +38,26 @@ export const NewClaimWizard: React.FC<NewClaimWizardProps> = ({
   const [claimantEmail, setClaimantEmail] = useState<string>('rahul.sharma@example.com');
   const [claimedAmount, setClaimedAmount] = useState<number>(500000);
 
-  // File Upload State
-  const [uploadedFiles, setUploadedFiles] = useState<{ id: string; name: string; size: number; type: string; contentText?: string }[]>([]);
+  // File Upload State — now includes extraction results
+  const [uploadedFiles, setUploadedFiles] = useState<{
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    extractedText?: string;
+    extractionConfidence?: number;
+    extractionMethod?: string;
+    extractionError?: string;
+    storageUrl?: string;
+    validationPassed?: boolean;
+    validationReason?: string;
+    uploadStatus: 'idle' | 'uploading' | 'extracting' | 'success' | 'warning' | 'error';
+  }[]>([]);
 
   // AI Pipeline Execution States
   const [isProcessing, setIsProcessing] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState<{ stepName: string; percent: number }>({ stepName: '', percent: 0 });
+  const [pipelineSteps, setPipelineSteps] = useState<{ step: string; status: 'success' | 'warning' | 'failed'; message: string; durationMs: number }[]>([]);
   const [processedClaimResult, setProcessedClaimResult] = useState<ClaimRecord | null>(null);
 
   if (!isOpen) return null;
@@ -62,41 +81,112 @@ export const NewClaimWizard: React.FC<NewClaimWizardProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, docId: string) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const newFile = {
-        id: docId,
-        name: file.name,
-        size: file.size,
-        type: file.type || 'application/pdf',
-        contentText: `Mock content for ${file.name} - ${docId}`
-      };
-      setUploadedFiles(prev => [...prev.filter(f => f.id !== docId), newFile]);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docId: string) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+
+    // Immediately show uploading state
+    const fileEntry = {
+      id: docId,
+      name: file.name,
+      size: file.size,
+      type: file.type || 'application/pdf',
+      uploadStatus: 'uploading' as const,
+    };
+    setUploadedFiles(prev => [...prev.filter(f => f.id !== docId), fileEntry]);
+
+    try {
+      // Build FormData with the real file bytes
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('docType', docId);
+      formData.append('insuranceType', selectedType);
+      formData.append('claimId', 'pending');
+
+      // Update status to extracting
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === docId ? { ...f, uploadStatus: 'extracting' as const } : f
+      ));
+
+      // Upload to server — server handles extraction + validation + storage
+      const { data: { session } } = await (await import('../../lib/supabase')).getSupabaseClient()?.auth.getSession() || { data: { session: null } };
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch('/api/documents/upload', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Upload failed: ${res.status}`);
+      }
+
+      const result = await res.json();
+
+      // Determine upload status from extraction results
+      let uploadStatus: 'success' | 'warning' | 'error' = 'success';
+      if (result.extraction?.error || result.extraction?.confidence === 0) {
+        uploadStatus = 'error';
+      } else if (
+        (result.extraction?.confidence !== undefined && result.extraction.confidence < 0.5) ||
+        (result.validation && !result.validation.isValid)
+      ) {
+        uploadStatus = 'warning';
+      }
+
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === docId ? {
+          ...f,
+          uploadStatus,
+          extractedText: result.extraction?.text,
+          extractionConfidence: result.extraction?.confidence,
+          extractionMethod: result.extraction?.method,
+          extractionError: result.extraction?.error,
+          storageUrl: result.storageUrl,
+          validationPassed: result.validation?.isValid,
+          validationReason: result.validation?.reason,
+        } : f
+      ));
+    } catch (err: any) {
+      console.error('File upload/extraction failed:', err);
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === docId ? {
+          ...f,
+          uploadStatus: 'error' as const,
+          extractionError: err?.message || 'Upload failed',
+        } : f
+      ));
     }
   };
 
   const handleRunPipeline = async () => {
     setIsProcessing(true);
+    setPipelineSteps([]);
     setStep(5); // Progress Visualizer Step
-
-    // Pipeline Animation Sequence
-    const steps = [
-      { name: '1/6 Input Validator & File Checklist', percent: 15 },
-      { name: '2/6 Document Classification & OCR Parser', percent: 35 },
-      { name: '3/6 Gemini Flash Field Extractor', percent: 55 },
-      { name: '4/6 Base & Type-Specific Fraud Detection', percent: 75 },
-      { name: '5/6 Policy Verification & Strategy Estimator', percent: 90 },
-      { name: '6/6 PDF Report Generation & Masked Storage', percent: 100 }
-    ];
-
-    for (let i = 0; i < steps.length; i++) {
-      setPipelineProgress({ stepName: steps[i].name, percent: steps[i].percent });
-      await new Promise(r => setTimeout(r, 450));
-    }
+    setPipelineProgress({ stepName: 'Submitting claim to AI pipeline...', percent: 10 });
 
     try {
-      const res = await fetch('/api/pipeline/process', {
+      // Prepare files with extraction data for the pipeline
+      const filesForPipeline = uploadedFiles.map(f => ({
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        extractedText: f.extractedText,
+        extractionConfidence: f.extractionConfidence,
+        extractionMethod: f.extractionMethod,
+        extractionError: f.extractionError,
+        storageUrl: f.storageUrl,
+        validationPassed: f.validationPassed,
+        validationReason: f.validationReason,
+      }));
+
+      setPipelineProgress({ stepName: 'Running AI extraction, fraud detection & estimation...', percent: 40 });
+
+      const res = await apiFetch('/api/pipeline/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,18 +196,27 @@ export const NewClaimWizard: React.FC<NewClaimWizardProps> = ({
           claimantName,
           claimantEmail,
           claimedAmount,
-          files: uploadedFiles
+          files: filesForPipeline
         })
       });
 
       const data = await res.json();
+
+      setPipelineProgress({ stepName: 'Pipeline complete', percent: 100 });
+
+      if (data.pipelineSteps) {
+        setPipelineSteps(data.pipelineSteps);
+      }
+
       if (data.success && data.claim) {
         setProcessedClaimResult(data.claim);
         onClaimSubmitted(data.claim);
-        setStep(6); // Confirmation Step
+        // Brief delay to show completed steps, then move to confirmation
+        setTimeout(() => setStep(6), 1200);
       }
     } catch (err) {
       console.error('Failed to run AI pipeline endpoint:', err);
+      setPipelineProgress({ stepName: 'Pipeline failed', percent: 100 });
     } finally {
       setIsProcessing(false);
     }
@@ -360,52 +459,92 @@ export const NewClaimWizard: React.FC<NewClaimWizardProps> = ({
                   Required Document Checklist ({config.title})
                 </h4>
                 <p className="text-xs text-[#957C62]">
-                  Upload supporting files. Input Validator verifies presence before running AI extraction.
+                  Upload documents for real-time OCR extraction and content validation.
                 </p>
               </div>
 
               <div className="space-y-2.5">
                 {config.requiredDocs.map((doc) => {
                   const uploaded = uploadedFiles.find(f => f.id === doc.id);
+                  const statusBg = !uploaded ? (doc.required ? 'bg-[#FAF7F2] border-[#E2B59A]/60' : 'bg-[#FAF7F2]/60 border-[#E2B59A]/40 opacity-80')
+                    : uploaded.uploadStatus === 'success' ? 'bg-emerald-50 border-emerald-300'
+                    : uploaded.uploadStatus === 'warning' ? 'bg-amber-50 border-amber-300'
+                    : uploaded.uploadStatus === 'error' ? 'bg-rose-50 border-rose-300'
+                    : 'bg-blue-50 border-blue-300';
+
                   return (
                     <div
                       key={doc.id}
-                      className={`p-3.5 rounded-xl border flex items-center justify-between ${
-                        uploaded
-                          ? 'bg-emerald-50 border-emerald-300'
-                          : doc.required
-                          ? 'bg-[#FAF7F2] border-[#E2B59A]/60'
-                          : 'bg-[#FAF7F2]/60 border-[#E2B59A]/40 opacity-80'
-                      }`}
+                      className={`p-3.5 rounded-xl border ${statusBg}`}
                     >
-                      <div className="space-y-0.5 max-w-md">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-bold text-[#2C221E]">{doc.name}</span>
-                          {doc.required ? (
-                            <span className="text-[10px] text-rose-700 font-bold uppercase">Required</span>
-                          ) : (
-                            <span className="text-[10px] text-[#957C62]">Optional</span>
-                          )}
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5 max-w-md">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-bold text-[#2C221E]">{doc.name}</span>
+                            {doc.required ? (
+                              <span className="text-[10px] text-rose-700 font-bold uppercase">Required</span>
+                            ) : (
+                              <span className="text-[10px] text-[#957C62]">Optional</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#957C62]">{doc.description}</p>
                         </div>
-                        <p className="text-[11px] text-[#957C62]">{doc.description}</p>
+
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            onChange={(e) => handleFileUpload(e, doc.id)}
+                            className="hidden"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                          />
+                          <div className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                            !uploaded
+                              ? 'bg-white hover:bg-[#FFE1AF]/40 border border-[#E2B59A] text-[#2C221E]'
+                              : uploaded.uploadStatus === 'uploading' || uploaded.uploadStatus === 'extracting'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                              : uploaded.uploadStatus === 'success'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : uploaded.uploadStatus === 'warning'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                          }`}>
+                            {!uploaded && <><UploadCloud className="w-3.5 h-3.5" /><span>Choose File</span></>}
+                            {uploaded?.uploadStatus === 'uploading' && <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Uploading...</span></>}
+                            {uploaded?.uploadStatus === 'extracting' && <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Extracting...</span></>}
+                            {uploaded?.uploadStatus === 'success' && <><CheckCircle className="w-3.5 h-3.5" /><span>Extracted</span></>}
+                            {uploaded?.uploadStatus === 'warning' && <><AlertTriangle className="w-3.5 h-3.5" /><span>Low Confidence</span></>}
+                            {uploaded?.uploadStatus === 'error' && <><XCircle className="w-3.5 h-3.5" /><span>Failed — Retry</span></>}
+                          </div>
+                        </label>
                       </div>
 
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          onChange={(e) => handleFileUpload(e, doc.id)}
-                          className="hidden"
-                          accept=".pdf,.png,.jpg,.jpeg"
-                        />
-                        <div className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
-                          uploaded
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : 'bg-white hover:bg-[#FFE1AF]/40 border border-[#E2B59A] text-[#2C221E]'
-                        }`}>
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>{uploaded ? 'Uploaded' : 'Choose File'}</span>
+                      {/* Per-file extraction details */}
+                      {uploaded && (uploaded.uploadStatus === 'success' || uploaded.uploadStatus === 'warning') && (
+                        <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
+                          <div className="flex items-center gap-2 text-[10px]">
+                            <span className="font-bold">Method:</span>
+                            <span>{uploaded.extractionMethod === 'pdf_text_layer' ? 'PDF Text Layer' : uploaded.extractionMethod === 'ocr' ? 'OCR (Tesseract)' : 'N/A'}</span>
+                            <span className="font-bold ml-2">Confidence:</span>
+                            <span>{uploaded.extractionConfidence !== undefined ? `${Math.round(uploaded.extractionConfidence * 100)}%` : 'N/A'}</span>
+                          </div>
+                          {uploaded.validationPassed === false && uploaded.validationReason && (
+                            <p className="text-[10px] text-amber-800 font-medium">
+                              ⚠ {uploaded.validationReason}
+                            </p>
+                          )}
+                          {uploaded.extractedText && (
+                            <p className="text-[10px] text-[#957C62] line-clamp-2 italic">
+                              "{uploaded.extractedText.substring(0, 120)}..."
+                            </p>
+                          )}
                         </div>
-                      </label>
+                      )}
+
+                      {uploaded?.uploadStatus === 'error' && uploaded.extractionError && (
+                        <p className="mt-2 text-[10px] text-rose-700 font-medium">
+                          ✕ {uploaded.extractionError}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -430,34 +569,60 @@ export const NewClaimWizard: React.FC<NewClaimWizardProps> = ({
             </div>
           )}
 
-          {/* STEP 5: Live AI Pipeline Visualizer */}
+          {/* STEP 5: Live AI Pipeline Visualizer — Real Results */}
           {step === 5 && (
-            <div className="py-8 text-center space-y-6">
-              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border-4 border-[#E2B59A] border-t-[#B77466] animate-spin" />
-                <Sparkles className="w-8 h-8 text-[#B77466] animate-pulse" />
-              </div>
+            <div className="py-6 space-y-6">
+              {/* Spinner while processing */}
+              {isProcessing && (
+                <div className="text-center space-y-4">
+                  <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-4 border-[#E2B59A] border-t-[#B77466] animate-spin" />
+                    <Sparkles className="w-6 h-6 text-[#B77466] animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-[#2C221E] mb-1">ClaimX AI Pipeline Executing</h4>
+                    <p className="text-xs text-[#957C62]">{pipelineProgress.stepName}</p>
+                  </div>
+                  <div className="max-w-md mx-auto bg-[#FAF7F2] p-1 rounded-full border border-[#E2B59A]">
+                    <div
+                      className="bg-[#B77466] h-2.5 rounded-full transition-all duration-500"
+                      style={{ width: `${pipelineProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <h4 className="text-lg font-bold text-[#2C221E] mb-1">ClaimX AI Pipeline Executing</h4>
-                <p className="text-xs text-[#957C62]">{pipelineProgress.stepName}</p>
-              </div>
-
-              <div className="max-w-md mx-auto bg-[#FAF7F2] p-1 rounded-full border border-[#E2B59A]">
-                <div
-                  className="bg-[#B77466] h-2.5 rounded-full transition-all duration-300"
-                  style={{ width: `${pipelineProgress.percent}%` }}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-[#957C62] max-w-lg mx-auto pt-2">
-                <span className="p-2 rounded bg-[#FAF7F2] border border-[#E2B59A]/40">Input Validator</span>
-                <span className="p-2 rounded bg-[#FAF7F2] border border-[#E2B59A]/40">Gemini Extractor</span>
-                <span className="p-2 rounded bg-[#FAF7F2] border border-[#E2B59A]/40">Identity Normalizer</span>
-                <span className="p-2 rounded bg-[#FAF7F2] border border-[#E2B59A]/40">Fraud Signal Audit</span>
-                <span className="p-2 rounded bg-[#FAF7F2] border border-[#E2B59A]/40">Policy Verifier</span>
-                <span className="p-2 rounded bg-[#FAF7F2] border border-[#E2B59A]/40">Strategy Estimator</span>
-              </div>
+              {/* Real Pipeline Step Results */}
+              {pipelineSteps.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-[#957C62] uppercase tracking-wider">Pipeline Step Results</h4>
+                  {pipelineSteps.map((ps, i) => (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-xl border flex items-start gap-3 text-xs ${
+                        ps.status === 'success'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                          : ps.status === 'warning'
+                          ? 'bg-amber-50 border-amber-300 text-amber-900'
+                          : 'bg-rose-50 border-rose-300 text-rose-900'
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {ps.status === 'success' && <CheckCircle className="w-4 h-4 text-emerald-600" />}
+                        {ps.status === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600" />}
+                        {ps.status === 'failed' && <XCircle className="w-4 h-4 text-rose-600" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-bold block">{ps.step}</span>
+                        <span className="text-[11px] opacity-80">{ps.message}</span>
+                        {ps.durationMs > 0 && (
+                          <span className="text-[10px] opacity-60 ml-1">({ps.durationMs}ms)</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

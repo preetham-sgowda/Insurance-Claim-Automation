@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ClaimRecord, PolicyRecord } from '../types/claim';
+import { ClaimRecord, PolicyRecord, UserRole } from '../types/claim';
 import { SEED_POLICIES } from '../data/seedPolicies';
 
 // Helper to retrieve env vars or custom user config stored in localStorage
@@ -276,31 +276,43 @@ export async function signInUserWithEmailPassword(data: {
     }
   }
 
-  // Fallback to local storage validation
-  const storedUsers = getStoredUsers();
-  const matchedUser = storedUsers.find(u => u.email.toLowerCase() === normalizedEmail);
+  // Fallback to local storage validation/creation if Supabase is not configured
+  if (!client) {
+    const storedUsers = getStoredUsers();
+    const matchedUser = storedUsers.find(u => u.email.toLowerCase() === normalizedEmail);
 
-  if (matchedUser) {
-    // If password was set, check it; otherwise permit for preset users
-    if (matchedUser.passwordHash && password && matchedUser.passwordHash !== password) {
-      return { user: null, supabaseSaved: false, error: 'Incorrect password provided.' };
+    if (matchedUser) {
+      if (matchedUser.passwordHash && password && matchedUser.passwordHash !== password) {
+        return { user: null, supabaseSaved: false, error: 'Incorrect password provided.' };
+      }
+      return { user: matchedUser, supabaseSaved: false };
     }
-    return { user: matchedUser, supabaseSaved };
+
+    // Auto-create a mock account for the demo presets if they don't exist yet
+    const isAgent = normalizedEmail.includes('agent');
+    const isAdmin = normalizedEmail.includes('admin');
+    const role: UserRole = isAgent ? 'agent' : isAdmin ? 'admin' : 'claimant';
+    
+    const createdUser: StoredUserAccount = {
+      id: 'usr-' + Math.random().toString(36).substring(2, 10),
+      email: normalizedEmail,
+      passwordHash: password,
+      fullName: normalizedEmail.split('@')[0],
+      role,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(normalizedEmail)}`,
+      createdAt: new Date().toISOString()
+    };
+
+    saveStoredUser(createdUser);
+    return { user: createdUser, supabaseSaved: false };
   }
 
-  // Create or permit sign in
-  const createdUser: StoredUserAccount = {
-    id: generateUUID(),
-    email: normalizedEmail,
-    passwordHash: password,
-    fullName: normalizedEmail.split('@')[0],
-    role: 'claimant',
-    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(normalizedEmail)}`,
-    createdAt: new Date().toISOString()
+  // If Supabase is configured but login failed
+  return {
+    user: null,
+    supabaseSaved: false,
+    error: 'Authentication failed. Please check your email and password, or sign up for a new account.'
   };
-
-  saveStoredUser(createdUser);
-  return { user: createdUser, supabaseSaved };
 }
 
 /**
@@ -481,16 +493,76 @@ ALTER TABLE public.policy_holder_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fraud_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated and anon access for demo API endpoints
+-- ==========================================
+-- TIGHTENED RLS POLICIES (Role-Based Access)
+-- ==========================================
+
+-- USERS TABLE
 DROP POLICY IF EXISTS "Allow public read/write users" ON public.users;
-CREATE POLICY "Allow public read/write users" ON public.users FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Users read own profile" ON public.users;
+DROP POLICY IF EXISTS "Users update own profile" ON public.users;
+DROP POLICY IF EXISTS "Allow insert on signup" ON public.users;
 
+CREATE POLICY "Users read own profile"
+  ON public.users FOR SELECT
+  USING (
+    auth.uid()::text = id
+    OR (SELECT role FROM public.users WHERE id = auth.uid()::text) = 'admin'
+  );
+
+CREATE POLICY "Users update own profile"
+  ON public.users FOR UPDATE
+  USING (auth.uid()::text = id);
+
+CREATE POLICY "Allow insert on signup"
+  ON public.users FOR INSERT
+  WITH CHECK (auth.uid()::text = id);
+
+-- CLAIMS TABLE
 DROP POLICY IF EXISTS "Allow public read/write for demo" ON public.claims;
-CREATE POLICY "Allow public read/write for demo" ON public.claims FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Claimants read own claims" ON public.claims;
+DROP POLICY IF EXISTS "Claimants insert own claims" ON public.claims;
+DROP POLICY IF EXISTS "Agents and admins update claims" ON public.claims;
 
+CREATE POLICY "Claimants read own claims"
+  ON public.claims FOR SELECT
+  USING (
+    user_id = auth.uid()::text
+    OR (SELECT role FROM public.users WHERE id = auth.uid()::text) IN ('agent', 'admin')
+  );
+
+CREATE POLICY "Claimants insert own claims"
+  ON public.claims FOR INSERT
+  WITH CHECK (user_id = auth.uid()::text);
+
+CREATE POLICY "Agents and admins update claims"
+  ON public.claims FOR UPDATE
+  USING (
+    (SELECT role FROM public.users WHERE id = auth.uid()::text) IN ('agent', 'admin')
+  );
+
+-- POLICY_HOLDER_DATA TABLE
 DROP POLICY IF EXISTS "Allow public read/write policies" ON public.policy_holder_data;
-CREATE POLICY "Allow public read/write policies" ON public.policy_holder_data FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users read policies" ON public.policy_holder_data;
+DROP POLICY IF EXISTS "Admins manage policies" ON public.policy_holder_data;
 
+CREATE POLICY "Authenticated users read policies"
+  ON public.policy_holder_data FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Admins manage policies"
+  ON public.policy_holder_data FOR ALL
+  USING (
+    (SELECT role FROM public.users WHERE id = auth.uid()::text) = 'admin'
+  );
+
+-- FRAUD_LOGS TABLE
 DROP POLICY IF EXISTS "Allow public read/write fraud_logs" ON public.fraud_logs;
-CREATE POLICY "Allow public read/write fraud_logs" ON public.fraud_logs FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Agents and admins read fraud logs" ON public.fraud_logs;
+
+CREATE POLICY "Agents and admins read fraud logs"
+  ON public.fraud_logs FOR SELECT
+  USING (
+    (SELECT role FROM public.users WHERE id = auth.uid()::text) IN ('agent', 'admin')
+  );
 `;

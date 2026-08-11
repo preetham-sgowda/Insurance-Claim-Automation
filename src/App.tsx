@@ -8,8 +8,8 @@ import { AdminDashboard } from './components/Admin/AdminDashboard';
 import { SupabaseModal } from './components/SupabaseModal';
 import { NewClaimWizard } from './components/Claimant/NewClaimWizard';
 import { AuthModal } from './components/Auth/AuthModal';
-import { getStoredClaims, saveStoredClaim, updateStoredClaimStatus, getSupabaseCredentials } from './lib/supabase';
-import { runAIClaimPipeline } from './services/geminiPipeline';
+import { getStoredClaims, saveStoredClaim, updateStoredClaimStatus, getSupabaseCredentials, getSupabaseClient } from './lib/supabase';
+import { apiFetch } from './lib/apiClient';
 
 export default function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('claimant');
@@ -21,75 +21,122 @@ export default function App() {
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Logged-in User State
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>({
-    id: 'usr-001',
-    fullName: 'Preetham S Gowda',
-    email: 'sgowdapreetham14@gmail.com',
-    role: 'claimant',
-    avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Preetham',
-    createdAt: new Date().toISOString()
-  });
+  // Logged-in User State — initialized from Supabase session, not hardcoded
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
-  // Initialize Sample Claims across all 7 Insurance Products if empty
+  // Initialize: restore session from Supabase Auth + listen for auth changes
   useEffect(() => {
     const creds = getSupabaseCredentials();
     setIsSupabaseConnected(!!creds.url && !!creds.key && creds.url !== 'MY_SUPABASE_URL');
 
-    const existing = getStoredClaims();
-    if (existing.length === 0) {
-      seedInitialSampleClaims();
-    } else {
+    const client = getSupabaseClient();
+    if (!client) {
+      // No Supabase configured — load from local storage fallback
+      const existing = getStoredClaims();
       setClaims(existing);
+
+      if (typeof window !== 'undefined') {
+        const savedUserJson = localStorage.getItem('claimx_mock_user');
+        if (savedUserJson) {
+          try {
+            const savedUser = JSON.parse(savedUserJson);
+            setCurrentUser(savedUser);
+            setCurrentRole(savedUser.role);
+
+            // Re-assert token
+            const mockToken = `mock-token-for-${savedUser.role}-${savedUser.id}-${encodeURIComponent(savedUser.fullName)}`;
+            localStorage.setItem('claimx_mock_token', mockToken);
+          } catch (e) {
+            console.error('Failed to parse saved mock user:', e);
+          }
+        }
+      }
+      return;
     }
+
+    // Restore existing session
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        restoreUserProfile(session.user);
+      }
+    });
+
+    // Subscribe to auth state changes (login, logout, token refresh)
+    const { data: { subscription } } = client.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          restoreUserProfile(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setClaims([]);
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const seedInitialSampleClaims = async () => {
-    // Generate sample claims across products in INR
-    const sample1 = await runAIClaimPipeline({
-      insuranceType: 'life',
-      claimSubType: 'natural_death',
-      policyNumber: 'CX-LIFE-882190',
-      claimantName: 'Rahul Sharma',
-      claimantEmail: 'rahul.sharma@example.com',
-      claimedAmount: 500000,
-      files: [{ name: 'death_certificate.pdf', size: 240000, type: 'application/pdf' }]
-    });
+  // When user changes, reload claims from server
+  useEffect(() => {
+    if (currentUser) {
+      loadClaimsFromServer();
+    }
+  }, [currentUser?.id]);
 
-    const sample2 = await runAIClaimPipeline({
-      insuranceType: 'health',
-      claimSubType: 'reimbursement',
-      policyNumber: 'CX-HLT-410293',
-      claimantName: 'Amit Verma',
-      claimantEmail: 'amit.verma@example.com',
-      claimedAmount: 120000,
-      files: [{ name: 'discharge_summary.pdf', size: 180000, type: 'application/pdf' }]
-    });
+  /**
+   * Restore a UserProfile from Supabase Auth user + public.users table
+   */
+  async function restoreUserProfile(authUser: any) {
+    const client = getSupabaseClient();
+    let role: UserRole = 'claimant';
+    let fullName = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User';
 
-    const sample3 = await runAIClaimPipeline({
-      insuranceType: 'motor',
-      claimSubType: 'own_damage',
-      policyNumber: 'CX-MTR-772391',
-      claimantName: 'Siddharth Rao',
-      claimantEmail: 'siddharth.rao@example.com',
-      claimedAmount: 45000,
-      files: [{ name: 'garage_estimate.pdf', size: 120000, type: 'application/pdf' }]
-    });
+    if (client) {
+      const { data: dbUser } = await client
+        .from('users')
+        .select('full_name, role')
+        .eq('id', authUser.id)
+        .maybeSingle();
 
-    const sample4 = await runAIClaimPipeline({
-      insuranceType: 'liability',
-      claimSubType: 'professional_indemnity',
-      policyNumber: 'CX-LIA-990123',
-      claimantName: 'Preetham S Gowda',
-      claimantEmail: 'sgowdapreetham14@gmail.com',
-      claimedAmount: 750000,
-      files: [{ name: 'legal_notice_demand.pdf', size: 310000, type: 'application/pdf' }]
-    });
+      if (dbUser) {
+        role = dbUser.role || 'claimant';
+        fullName = dbUser.full_name || fullName;
+      }
+    }
 
-    const initial = [sample1, sample2, sample3, sample4];
-    initial.forEach(saveStoredClaim);
-    setClaims(initial);
-  };
+    const profile: UserProfile = {
+      id: authUser.id,
+      email: authUser.email || '',
+      fullName,
+      role,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(fullName)}`,
+      createdAt: authUser.created_at || new Date().toISOString(),
+    };
+
+    setCurrentUser(profile);
+    setCurrentRole(role);
+  }
+
+  /**
+   * Load claims from the server API (which now reads from Supabase)
+   */
+  async function loadClaimsFromServer() {
+    try {
+      const res = await apiFetch('/api/claims/list');
+      if (res.ok) {
+        const data = await res.json();
+        setClaims(data.claims || []);
+      } else if (res.status === 401) {
+        // Not authenticated — clear user
+        console.warn('Claims API returned 401 — user may need to re-authenticate');
+      }
+    } catch (err) {
+      console.warn('Failed to load claims from server, falling back to local:', err);
+      setClaims(getStoredClaims());
+    }
+  }
 
   const claimsCountByLine = claims.reduce((acc, c) => {
     acc[c.insuranceType] = (acc[c.insuranceType] || 0) + 1;
@@ -97,7 +144,8 @@ export default function App() {
   }, {} as Record<string, number>);
 
   const handleClaimSubmitted = (newClaim: ClaimRecord) => {
-    saveStoredClaim(newClaim);
+    // Claim is already persisted to Supabase by the server pipeline endpoint
+    saveStoredClaim(newClaim); // Also save locally for immediate UI update
     setClaims(prev => [newClaim, ...prev]);
   };
 
@@ -110,7 +158,7 @@ export default function App() {
     const updated = updateStoredClaimStatus(claimId, {
       status: nextStatus,
       agentReview: {
-        agentId: 'agt-specialist-01',
+        agentId: currentUser?.id || 'agt-specialist-01',
         agentName: currentUser?.fullName || 'Senior Agent Specialist',
         recommendedPayout: review.recommendedPayout,
         recommendation: review.recommendation,
@@ -162,10 +210,25 @@ export default function App() {
     setCurrentUser(user);
     setCurrentRole(user.role);
     setIsAuthModalOpen(false);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('claimx_mock_user', JSON.stringify(user));
+      const mockToken = `mock-token-for-${user.role}-${user.id}-${encodeURIComponent(user.fullName)}`;
+      localStorage.setItem('claimx_mock_token', mockToken);
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const client = getSupabaseClient();
+    if (client) {
+      await client.auth.signOut();
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('claimx_mock_user');
+      localStorage.removeItem('claimx_mock_token');
+    }
     setCurrentUser(null);
+    setClaims([]);
   };
 
   return (

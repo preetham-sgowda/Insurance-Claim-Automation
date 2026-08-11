@@ -127,7 +127,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         email,
         password,
         fullName,
-        role: selectedRole
+        role: 'claimant' // Self-signup is always claimant; agent/admin provisioned separately
       });
 
       const profile: UserProfile = {
@@ -462,50 +462,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Role Selector */}
+                  {/* Role Assignment Notice */}
                   <div>
                     <label className="block text-xs font-bold text-[#957C62] uppercase tracking-wider mb-2">
-                      Assign Portal Role
+                      Account Role
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRole('claimant')}
-                        className={`p-2.5 rounded-xl border text-center transition ${
-                          selectedRole === 'claimant'
-                            ? 'border-[#B77466] bg-[#FFE1AF]/40 text-[#2C221E] font-bold'
-                            : 'border-[#E2B59A]/40 bg-white text-[#957C62]'
-                        }`}
-                      >
-                        <User className="w-4 h-4 text-[#B77466] mx-auto mb-1" />
-                        <span className="text-[11px] block">Claimant</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRole('agent')}
-                        className={`p-2.5 rounded-xl border text-center transition ${
-                          selectedRole === 'agent'
-                            ? 'border-[#B77466] bg-[#FFE1AF]/40 text-[#2C221E] font-bold'
-                            : 'border-[#E2B59A]/40 bg-white text-[#957C62]'
-                        }`}
-                      >
-                        <ShieldCheck className="w-4 h-4 text-[#B77466] mx-auto mb-1" />
-                        <span className="text-[11px] block">Agent</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRole('admin')}
-                        className={`p-2.5 rounded-xl border text-center transition ${
-                          selectedRole === 'admin'
-                            ? 'border-[#B77466] bg-[#FFE1AF]/40 text-[#2C221E] font-bold'
-                            : 'border-[#E2B59A]/40 bg-white text-[#957C62]'
-                        }`}
-                      >
-                        <ShieldAlert className="w-4 h-4 text-[#B77466] mx-auto mb-1" />
-                        <span className="text-[11px] block">Admin</span>
-                      </button>
+                    <div className="p-3 rounded-xl border border-[#E2B59A]/40 bg-[#FAF7F2] flex items-center gap-3">
+                      <User className="w-5 h-5 text-[#B77466]" />
+                      <div>
+                        <span className="text-xs font-bold text-[#2C221E] block">Policyholder (Claimant)</span>
+                        <span className="text-[10px] text-[#957C62]">
+                          Agent and Admin accounts are provisioned by system administrators.
+                        </span>
+                      </div>
                     </div>
                   </div>
 
