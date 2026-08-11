@@ -1,5 +1,5 @@
 import { PDFParse } from 'pdf-parse';
-import Tesseract from 'tesseract.js';
+import { createWorker } from 'tesseract.js';
 import sharp from 'sharp';
 
 /**
@@ -49,9 +49,13 @@ async function preprocessImageForOCR(imageBuffer: Buffer): Promise<Buffer> {
 async function runOCR(imageBuffer: Buffer): Promise<{ text: string; confidence: number }> {
   const preprocessed = await preprocessImageForOCR(imageBuffer);
 
-  const { data } = await Tesseract.recognize(preprocessed, 'eng', {
-    logger: () => {}, // Suppress progress logs
+  const worker = await createWorker('eng', 1, {
+    cachePath: '/tmp',
+    cacheMethod: 'write',
   });
+
+  const { data } = await worker.recognize(preprocessed);
+  await worker.terminate();
 
   return {
     text: data.text.trim(),
