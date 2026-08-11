@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: nexsettle
+    runtime: python
+    rootDir: backend
+    plan: free
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start_render.sh
+    healthCheckPath: /api/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: "nexsettle_db"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: USE_GEMINI
+        value: "True"
+      - key: USE_CREW_AI
+        value: "True"
+      - key: AI_ORCHESTRATOR
+        value: "crewai"
+      - key: RUN_BOOTSTRAP_ON_START
+        value: "true"
+      - key: SEED_ADMIN_ON_START
+        value: "false"
+      - key: SEED_POLICY_DATA_ON_START
+        value: "false"
+      - key: EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+

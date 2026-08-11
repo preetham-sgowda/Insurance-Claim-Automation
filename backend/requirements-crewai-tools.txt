@@ -1,0 +1,4 @@
+# Optional: advanced CrewAI tools package.
+# On Windows, this may require Microsoft C++ Build Tools
+# because of transitive dependency: chroma-hnswlib.
+crewai-tools==0.14.0

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Sign In — NexSettle</title>
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-bg-glow top-right"></div>
+  <div class="auth-bg-glow bottom-left"></div>
+
+  <div class="auth-card">
+    <div class="auth-header">
+      <a href="../index.html" class="auth-logo" style="justify-content:center;text-decoration:none">
+        <div class="logo-icon">N</div>
+        <div>
+          <div class="logo-text">NexSettle</div>
+          <div class="logo-tagline">AI Claims Automation</div>
+        </div>
+      </a>
+      <h1 class="auth-title mt-2">Admin Portal</h1>
+      <p class="auth-subtitle">Platform administration and oversight</p>
+    </div>
+
+    <div class="alert alert-warning mb-3">
+      <span class="alert-icon">⚙️</span>
+      <span>Restricted access. Admin credentials are required to proceed.</span>
+    </div>
+
+    <form id="admin-login-form" novalidate>
+      <div id="form-alert" class="alert alert-error hidden" style="margin-bottom:1rem">
+        <span class="alert-icon">❌</span>
+        <span id="form-alert-msg"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Admin Email</label>
+        <div class="input-group">
+          <span class="input-icon">📧</span>
+          <input id="email" type="email" class="form-control" placeholder="admin@nexsettle.org" autocomplete="email" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input id="password" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password" required />
+          <button type="button" class="input-suffix" id="toggle-password">👁️</button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-full btn-lg mt-2" id="submit-btn">
+        ⚙️ Sign In as Admin
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <a href="login.html">← Claimant Login</a> &nbsp;|&nbsp; <a href="agent-login.html">Agent Portal</a>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+</div>
+
+<script type="module">
+  import { Admin, setToken, setUser, isLoggedIn, getRole } from '../js/api.js';
+  import { showToast, setButtonLoading } from '../js/ui.js';
+
+  if (isLoggedIn() && getRole() === 'admin') {
+    window.location.href = 'admin-dashboard.html';
+  }
+
+  document.getElementById('toggle-password').addEventListener('click', function () {
+    const pwd = document.getElementById('password');
+    pwd.type = pwd.type === 'password' ? 'text' : 'password';
+    this.textContent = pwd.type === 'password' ? '👁️' : '🙈';
+  });
+
+  document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const alertEl  = document.getElementById('form-alert');
+    const alertMsg = document.getElementById('form-alert-msg');
+    alertEl.classList.add('hidden');
+
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!email || !password) {
+      alertMsg.textContent = 'Both fields are required.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Authenticating…');
+    const { ok, data } = await Admin.login(email, password);
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      alertMsg.textContent = data?.error || 'Login failed.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setToken(data.token);
+    setUser(data.admin, 'admin');
+    showToast('Welcome, Admin!', `Signed in as ${data.admin.name}`, 'success');
+    setTimeout(() => { window.location.href = 'admin-dashboard.html'; }, 500);
+  });
+</script>
+</body>
+</html>

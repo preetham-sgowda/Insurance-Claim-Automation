@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — NexSettle</title>
+  <meta name="description" content="Sign in to the NexSettle claimant portal to submit and track your insurance claims." />
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-bg-glow top-right"></div>
+  <div class="auth-bg-glow bottom-left"></div>
+
+  <div class="auth-card">
+    <div class="auth-header">
+      <a href="../index.html" class="auth-logo" style="justify-content:center;text-decoration:none">
+        <div class="logo-icon">N</div>
+        <div>
+          <div class="logo-text">NexSettle</div>
+          <div class="logo-tagline">AI Claims Automation</div>
+        </div>
+      </a>
+      <h1 class="auth-title mt-2">Welcome back</h1>
+      <p class="auth-subtitle">Sign in to your claimant account</p>
+    </div>
+
+    <form id="login-form" novalidate>
+      <div id="form-alert" class="alert alert-error hidden" style="margin-bottom:1rem">
+        <span class="alert-icon">❌</span>
+        <span id="form-alert-msg"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email Address</label>
+        <div class="input-group">
+          <span class="input-icon">📧</span>
+          <input id="email" type="email" class="form-control" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input id="password" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password" required />
+          <button type="button" class="input-suffix" id="toggle-password" aria-label="Show/hide password">👁️</button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-full btn-lg mt-2" id="submit-btn">
+        Sign In
+      </button>
+    </form>
+
+    <div class="auth-divider"><span>or</span></div>
+
+    <div style="display:flex;flex-direction:column;gap:0.75rem">
+      <a href="agent-login.html" class="btn btn-outline w-full">🕵️ Agent Portal</a>
+      <a href="admin-login.html" class="btn btn-outline w-full">⚙️ Admin Portal</a>
+    </div>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="register.html">Create one</a>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+</div>
+
+<script type="module">
+  import { Auth, setToken, setUser, isLoggedIn, getRole } from '../js/api.js';
+  import { showToast, setButtonLoading } from '../js/ui.js';
+
+  // Redirect if already logged in
+  if (isLoggedIn()) {
+    const role = getRole();
+    if (role === 'admin') window.location.href = 'admin-dashboard.html';
+    else if (role === 'agent') window.location.href = 'agent-dashboard.html';
+    else window.location.href = 'dashboard.html';
+  }
+
+  // Toggle password visibility
+  document.getElementById('toggle-password').addEventListener('click', function () {
+    const pwd = document.getElementById('password');
+    pwd.type = pwd.type === 'password' ? 'text' : 'password';
+    this.textContent = pwd.type === 'password' ? '👁️' : '🙈';
+  });
+
+  // Form submit
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const alertEl = document.getElementById('form-alert');
+    const alertMsg = document.getElementById('form-alert-msg');
+
+    alertEl.classList.add('hidden');
+
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!email || !password) {
+      alertMsg.textContent = 'Please enter your email and password.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Signing in…');
+
+    const { ok, data } = await Auth.login(email, password);
+
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      const msg = data?.error || 'Login failed. Please try again.';
+      alertMsg.textContent = msg;
+      alertEl.classList.remove('hidden');
+
+      // If account not verified, redirect to OTP page
+      if (data?.user_id) {
+        showToast('Verify Email', 'Please verify your email first.', 'warning');
+        setTimeout(() => {
+          window.location.href = `verify-otp.html?user_id=${data.user_id}`;
+        }, 1500);
+      }
+      return;
+    }
+
+    setToken(data.token);
+    setUser(data.user, 'user');
+    showToast('Welcome back!', `Signed in as ${data.user.username}`, 'success');
+    setTimeout(() => {
+      window.location.href = 'dashboard.html';
+    }, 500);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">NexSettle Architecture</title>
+  <desc id="desc">High-level architecture of NexSettle showing UI, backend API, AI pipeline, and MongoDB storage.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#111a2e"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#17243f"/>
+      <stop offset="100%" stop-color="#1f3158"/>
+    </linearGradient>
+    <style>
+      .title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #e7efff; }
+      .subtitle { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #aac1ef; }
+      .section { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #d7e6ff; }
+      .label { font: 600 13px 'Segoe UI', Arial, sans-serif; fill: #f3f7ff; }
+      .small { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #c3d6ff; }
+      .panel { fill: url(#card); stroke: #36518b; stroke-width: 1.2; rx: 14; }
+      .node { fill: #1a2a4f; stroke: #5b80d4; stroke-width: 1.1; rx: 10; }
+      .db { fill: #18392a; stroke: #4aa877; stroke-width: 1.1; rx: 10; }
+      .arrow { stroke: #89a9e8; stroke-width: 2; fill: none; marker-end: url(#m); }
+      .arrow2 { stroke: #67d39d; stroke-width: 2; fill: none; marker-end: url(#m2); }
+      .muted { stroke: #5f739f; stroke-width: 1.5; fill: none; marker-end: url(#m3); }
+    </style>
+    <marker id="m" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#89a9e8"/>
+    </marker>
+    <marker id="m2" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#67d39d"/>
+    </marker>
+    <marker id="m3" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f739f"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="900" fill="url(#bg)"/>
+  <text x="40" y="52" class="title">NexSettle - System Architecture</text>
+  <text x="40" y="78" class="subtitle">Django + LangGraph/CrewAI + Gemini 2.5 Flash + OCR + MongoDB</text>
+
+  <rect x="40" y="110" width="300" height="740" class="panel"/>
+  <text x="58" y="142" class="section">UI Layer</text>
+  <rect x="60" y="170" width="260" height="58" class="node"/>
+  <text x="80" y="205" class="label">Landing / Auth Pages</text>
+  <rect x="60" y="250" width="260" height="58" class="node"/>
+  <text x="80" y="285" class="label">Claimant Dashboard</text>
+  <rect x="60" y="330" width="260" height="58" class="node"/>
+  <text x="80" y="365" class="label">Agent Dashboard</text>
+  <rect x="60" y="410" width="260" height="58" class="node"/>
+  <text x="80" y="445" class="label">Admin Dashboard</text>
+  <rect x="60" y="510" width="260" height="84" class="node"/>
+  <text x="80" y="543" class="label">Document Upload</text>
+  <text x="80" y="565" class="small">PDF/JPG/PNG/JPEG/TXT</text>
+  <text x="80" y="584" class="small">Multipart request to API</text>
+
+  <rect x="390" y="110" width="360" height="740" class="panel"/>
+  <text x="408" y="142" class="section">Backend Layer (Django)</text>
+  <rect x="410" y="170" width="320" height="58" class="node"/>
+  <text x="430" y="205" class="label">URL Router + View Controllers</text>
+  <rect x="410" y="250" width="320" height="58" class="node"/>
+  <text x="430" y="285" class="label">Authentication + OTP Service</text>
+  <rect x="410" y="330" width="320" height="58" class="node"/>
+  <text x="430" y="365" class="label">Claims / Admin / Agent APIs</text>
+  <rect x="410" y="410" width="320" height="58" class="node"/>
+  <text x="430" y="445" class="label">Pipeline Entry Endpoint</text>
+  <rect x="410" y="510" width="320" height="84" class="node"/>
+  <text x="430" y="543" class="label">Validation + Normalization</text>
+  <text x="430" y="565" class="small">status: success / partial / invalid / failed_ocr</text>
+  <text x="430" y="584" class="small">strict extraction and masking rules</text>
+
+  <rect x="800" y="110" width="340" height="740" class="panel"/>
+  <text x="818" y="142" class="section">AI Pipeline Layer</text>
+  <rect x="820" y="170" width="300" height="52" class="node"/>
+  <text x="840" y="202" class="label">DocumentClassifier</text>
+  <rect x="820" y="236" width="300" height="52" class="node"/>
+  <text x="840" y="268" class="label">OCRProcessor (Tesseract/pdf2image)</text>
+  <rect x="820" y="302" width="300" height="52" class="node"/>
+  <text x="840" y="334" class="label">DataExtractor (Gemini / Regex fallback)</text>
+  <rect x="820" y="368" width="300" height="52" class="node"/>
+  <text x="840" y="400" class="label">FraudDetector</text>
+  <rect x="820" y="434" width="300" height="52" class="node"/>
+  <text x="840" y="466" class="label">PolicyVerifier</text>
+  <rect x="820" y="500" width="300" height="52" class="node"/>
+  <text x="840" y="532" class="label">ClaimEstimator</text>
+  <rect x="820" y="566" width="300" height="52" class="node"/>
+  <text x="840" y="598" class="label">ReportGenerator (PDF)</text>
+  <rect x="820" y="632" width="300" height="52" class="node"/>
+  <text x="840" y="664" class="label">MongoDBStorage</text>
+
+  <rect x="1190" y="110" width="170" height="740" class="panel"/>
+  <text x="1208" y="142" class="section">Data Layer</text>
+  <rect x="1210" y="190" width="130" height="68" class="db"/>
+  <text x="1224" y="220" class="label">MongoDB</text>
+  <text x="1220" y="240" class="small">nexsettle_db</text>
+
+  <rect x="1210" y="290" width="130" height="98" class="db"/>
+  <text x="1222" y="320" class="label">Collections</text>
+  <text x="1220" y="342" class="small">users, otp, claims,</text>
+  <text x="1220" y="360" class="small">docs, reports, logs</text>
+
+  <rect x="1210" y="420" width="130" height="70" class="db"/>
+  <text x="1222" y="451" class="label">PDF Reports</text>
+  <text x="1220" y="472" class="small">media/reports</text>
+
+  <rect x="1210" y="520" width="130" height="70" class="db"/>
+  <text x="1220" y="551" class="label">Claim Files</text>
+  <text x="1220" y="572" class="small">media/claims</text>
+
+  <path d="M320 539 L390 539" class="arrow"/>
+  <path d="M730 439 L800 439" class="arrow"/>
+  <path d="M1120 664 L1210 224" class="arrow2"/>
+  <path d="M1120 664 L1210 339" class="arrow2"/>
+  <path d="M1120 598 L1210 455" class="arrow2"/>
+  <path d="M1120 598 L1210 555" class="arrow2"/>
+
+  <path d="M970 222 L970 236" class="muted"/>
+  <path d="M970 288 L970 302" class="muted"/>
+  <path d="M970 354 L970 368" class="muted"/>
+  <path d="M970 420 L970 434" class="muted"/>
+  <path d="M970 486 L970 500" class="muted"/>
+  <path d="M970 552 L970 566" class="muted"/>
+  <path d="M970 618 L970 632" class="muted"/>
+
+  <text x="40" y="884" class="small">Orchestration can run via LangGraph or CrewAI based on environment flags.</text>
+</svg>

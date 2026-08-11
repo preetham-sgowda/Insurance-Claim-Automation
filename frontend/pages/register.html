@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account — NexSettle</title>
+  <meta name="description" content="Create your NexSettle claimant account to start submitting insurance claims." />
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-bg-glow top-right"></div>
+  <div class="auth-bg-glow bottom-left"></div>
+
+  <div class="auth-card">
+    <div class="auth-header">
+      <a href="../index.html" class="auth-logo" style="justify-content:center;text-decoration:none">
+        <div class="logo-icon">N</div>
+        <div>
+          <div class="logo-text">NexSettle</div>
+          <div class="logo-tagline">AI Claims Automation</div>
+        </div>
+      </a>
+      <h1 class="auth-title mt-2">Create account</h1>
+      <p class="auth-subtitle">Start submitting insurance claims in minutes</p>
+    </div>
+
+    <div id="step-register">
+      <form id="register-form" novalidate>
+        <div id="form-alert" class="alert alert-error hidden" style="margin-bottom:1rem">
+          <span class="alert-icon">❌</span>
+          <span id="form-alert-msg"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="username">Full Name</label>
+          <div class="input-group">
+            <span class="input-icon">👤</span>
+            <input id="username" type="text" class="form-control" placeholder="Ravi Kumar" autocomplete="name" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <div class="input-group">
+            <span class="input-icon">📧</span>
+            <input id="email" type="email" class="form-control" placeholder="you@example.com" autocomplete="email" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-group">
+            <span class="input-icon">🔒</span>
+            <input id="password" type="password" class="form-control" placeholder="Min 8 chars, 1 uppercase, 1 number" autocomplete="new-password" required />
+            <button type="button" class="input-suffix" id="toggle-password">👁️</button>
+          </div>
+          <div class="form-hint">Must be 8+ characters with at least one uppercase letter and one digit.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full btn-lg mt-2" id="submit-btn">
+          Create Account
+        </button>
+      </form>
+    </div>
+
+    <!-- OTP Step (hidden initially) -->
+    <div id="step-otp" class="hidden">
+      <div class="alert alert-info mb-2">
+        <span class="alert-icon">📧</span>
+        <span>We've sent a 6-digit OTP to your email. Please enter it below to verify your account.</span>
+      </div>
+
+      <div class="otp-container" id="otp-inputs">
+        <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+        <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+        <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+        <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+        <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+        <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+      </div>
+
+      <div id="otp-alert" class="alert alert-error hidden mb-2">
+        <span class="alert-icon">❌</span>
+        <span id="otp-alert-msg"></span>
+      </div>
+
+      <button class="btn btn-primary w-full btn-lg" id="verify-otp-btn">
+        Verify & Continue
+      </button>
+      <div style="text-align:center;margin-top:1rem;font-size:0.875rem;color:var(--text-secondary)">
+        Didn't receive it? <button class="btn btn-ghost btn-sm" id="resend-otp-btn" style="font-size:0.875rem">Resend OTP</button>
+      </div>
+    </div>
+
+    <div class="auth-footer">
+      Already have an account? <a href="login.html">Sign in</a>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+</div>
+
+<script type="module">
+  import { Auth, setToken, setUser } from '../js/api.js';
+  import { showToast, setButtonLoading } from '../js/ui.js';
+
+  let currentUserId = null;
+
+  // Toggle password
+  document.getElementById('toggle-password').addEventListener('click', function () {
+    const pwd = document.getElementById('password');
+    pwd.type = pwd.type === 'password' ? 'text' : 'password';
+    this.textContent = pwd.type === 'password' ? '👁️' : '🙈';
+  });
+
+  // OTP auto-advance
+  const otpInputs = document.querySelectorAll('.otp-input');
+  otpInputs.forEach((input, i) => {
+    input.addEventListener('input', () => {
+      input.value = input.value.replace(/\D/g, '').slice(-1);
+      if (input.value && i < otpInputs.length - 1) {
+        otpInputs[i + 1].focus();
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !input.value && i > 0) {
+        otpInputs[i - 1].focus();
+      }
+    });
+  });
+
+  function getOTPValue() {
+    return Array.from(otpInputs).map(i => i.value).join('');
+  }
+
+  // Register form
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const alertEl = document.getElementById('form-alert');
+    const alertMsg = document.getElementById('form-alert-msg');
+
+    alertEl.classList.add('hidden');
+
+    const username = document.getElementById('username').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!username || !email || !password) {
+      alertMsg.textContent = 'All fields are required.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Creating account…');
+    const { ok, data } = await Auth.register(username, email, password);
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      alertMsg.textContent = data?.error || 'Registration failed.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    currentUserId = data.user_id;
+    if (data?.debug_otp) {
+      showToast('Dev OTP', `Use OTP: ${data.debug_otp}`, 'warning', 10000);
+      const chars = String(data.debug_otp).split('');
+      otpInputs.forEach((inp, idx) => { inp.value = chars[idx] || ''; });
+    } else if (data?.otp_delivery === 'email_failed') {
+      showToast('OTP Email Failed', data?.otp_error || 'Email delivery failed. Use Resend OTP.', 'warning', 7000);
+    } else {
+      showToast('Account Created!', 'Please verify your email.', 'success');
+    }
+    document.getElementById('step-register').classList.add('hidden');
+    document.getElementById('step-otp').classList.remove('hidden');
+    otpInputs[0].focus();
+  });
+
+  // Verify OTP
+  document.getElementById('verify-otp-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('verify-otp-btn');
+    const alertEl = document.getElementById('otp-alert');
+    const alertMsg = document.getElementById('otp-alert-msg');
+    alertEl.classList.add('hidden');
+
+    const otp = getOTPValue();
+    if (otp.length !== 6) {
+      alertMsg.textContent = 'Please enter the complete 6-digit OTP.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Verifying…');
+    const { ok, data } = await Auth.verifyOTP(currentUserId, otp);
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      alertMsg.textContent = data?.error || 'OTP verification failed.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    showToast('Email Verified!', 'Redirecting to login…', 'success');
+    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+  });
+
+  // Resend OTP
+  document.getElementById('resend-otp-btn').addEventListener('click', async () => {
+    if (!currentUserId) return;
+    const { ok, data } = await Auth.resendOTP(currentUserId);
+    if (ok) {
+      if (data?.debug_otp) {
+        showToast('Dev OTP', `Use OTP: ${data.debug_otp}`, 'warning', 10000);
+        const chars = String(data.debug_otp).split('');
+        otpInputs.forEach((inp, idx) => { inp.value = chars[idx] || ''; });
+      } else {
+        showToast('OTP Resent', 'Check your email for the new OTP.', 'info');
+        otpInputs.forEach(i => i.value = '');
+      }
+      otpInputs[0].focus();
+    } else {
+      showToast('Failed', 'Could not resend OTP.', 'error');
+    }
+  });
+</script>
+</body>
+</html>

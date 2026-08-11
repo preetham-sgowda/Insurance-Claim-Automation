@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify Email — NexSettle</title>
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-bg-glow top-right"></div>
+  <div class="auth-bg-glow bottom-left"></div>
+
+  <div class="auth-card" style="max-width:400px">
+    <div class="auth-header">
+      <a href="../index.html" class="auth-logo" style="justify-content:center;text-decoration:none">
+        <div class="logo-icon">N</div>
+        <div>
+          <div class="logo-text">NexSettle</div>
+        </div>
+      </a>
+      <h1 class="auth-title mt-2">Verify your email</h1>
+      <p class="auth-subtitle" id="otp-sub-text">Enter the 6-digit OTP sent to your email address.</p>
+    </div>
+
+    <div class="otp-container" id="otp-inputs">
+      <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-input" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" />
+    </div>
+
+    <div id="otp-alert" class="alert alert-error hidden mb-2">
+      <span class="alert-icon">❌</span>
+      <span id="otp-alert-msg"></span>
+    </div>
+
+    <button class="btn btn-primary w-full btn-lg" id="verify-btn">Verify Email</button>
+
+    <div style="text-align:center;margin-top:1.25rem;font-size:0.875rem;color:var(--text-secondary)">
+      Didn't receive it?
+      <button class="btn btn-ghost btn-sm" id="resend-btn" style="font-size:0.875rem">Resend OTP</button>
+    </div>
+
+    <div class="auth-footer">
+      <a href="login.html">← Back to Login</a>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+</div>
+
+<script type="module">
+  import { Auth } from '../js/api.js';
+  import { showToast, setButtonLoading } from '../js/ui.js';
+
+  // Get user_id from query string
+  const params = new URLSearchParams(window.location.search);
+  const userId = params.get('user_id');
+
+  if (!userId) {
+    window.location.href = 'login.html';
+  }
+
+  // OTP inputs auto-advance
+  const otpInputs = document.querySelectorAll('.otp-input');
+  otpInputs.forEach((input, i) => {
+    input.addEventListener('input', () => {
+      input.value = input.value.replace(/\D/g, '').slice(-1);
+      if (input.value && i < otpInputs.length - 1) otpInputs[i + 1].focus();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !input.value && i > 0) otpInputs[i - 1].focus();
+    });
+  });
+
+  function getOTP() {
+    return Array.from(otpInputs).map(i => i.value).join('');
+  }
+
+  document.getElementById('verify-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('verify-btn');
+    const alertEl  = document.getElementById('otp-alert');
+    const alertMsg = document.getElementById('otp-alert-msg');
+    alertEl.classList.add('hidden');
+
+    const otp = getOTP();
+    if (otp.length !== 6) {
+      alertMsg.textContent = 'Please enter the complete 6-digit OTP.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Verifying…');
+    const { ok, data } = await Auth.verifyOTP(userId, otp);
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      alertMsg.textContent = data?.error || 'OTP verification failed.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    showToast('Email Verified!', 'Redirecting to login…', 'success');
+    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+  });
+
+  document.getElementById('resend-btn').addEventListener('click', async () => {
+    const { ok, data } = await Auth.resendOTP(userId);
+    if (ok) {
+      if (data?.debug_otp) {
+        showToast('Dev OTP', `Use OTP: ${data.debug_otp}`, 'warning', 10000);
+        const chars = String(data.debug_otp).split('');
+        otpInputs.forEach((inp, idx) => { inp.value = chars[idx] || ''; });
+      } else {
+        showToast('OTP Resent', 'Check your email.', 'info');
+        otpInputs.forEach(i => i.value = '');
+      }
+      otpInputs[0].focus();
+    } else {
+      showToast('Failed', 'Could not resend OTP.', 'error');
+    }
+  });
+
+  otpInputs[0].focus();
+</script>
+</body>
+</html>

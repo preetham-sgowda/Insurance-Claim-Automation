@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexSettle — AI-Powered Insurance Claims</title>
+  <meta name="description" content="NexSettle automates insurance claim processing with AI-powered OCR, fraud detection, and instant settlement recommendations." />
+  <link rel="stylesheet" href="css/main.css" />
+  <style>
+    /* Landing-specific styles */
+    .landing-page {
+      min-height: 100vh;
+      background: var(--grad-hero);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Animated background blobs */
+    .bg-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.12;
+      pointer-events: none;
+      animation: floatBlob 8s ease-in-out infinite alternate;
+    }
+
+    .blob-1 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--primary), transparent);
+      top: -200px; right: -100px;
+      animation-duration: 10s;
+    }
+    .blob-2 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, var(--accent), transparent);
+      bottom: -100px; left: -100px;
+      animation-duration: 12s;
+      animation-delay: -3s;
+    }
+    .blob-3 {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, #8b5cf6, transparent);
+      top: 40%; left: 30%;
+      animation-duration: 9s;
+      animation-delay: -6s;
+    }
+
+    @keyframes floatBlob {
+      from { transform: scale(1) translate(0, 0); }
+      to   { transform: scale(1.1) translate(30px, -20px); }
+    }
+
+    /* Nav */
+    .landing-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 3rem;
+      position: relative;
+      z-index: 10;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    .nav-link {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-link:hover { color: var(--text-primary); }
+
+    /* Hero */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 5rem 2rem 3rem;
+      position: relative;
+      z-index: 5;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(37,99,235,0.1);
+      border: 1px solid rgba(37,99,235,0.25);
+      border-radius: var(--radius-full);
+      padding: 0.4rem 1rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--primary-light);
+      margin-bottom: 2rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      animation: fadeIn 0.6s ease;
+    }
+
+    .hero-badge-dot {
+      width: 6px; height: 6px;
+      background: var(--primary-light);
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .hero-title {
+      font-size: clamp(2.5rem, 6vw, 4rem);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.5rem;
+      animation: slideUp 0.6s ease 0.1s both;
+    }
+
+    .hero-sub {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      animation: slideUp 0.6s ease 0.2s both;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: slideUp 0.6s ease 0.3s both;
+    }
+
+    /* Features */
+    .features {
+      padding: 5rem 3rem;
+      position: relative;
+      z-index: 5;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-xl);
+      padding: 2rem;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--grad-card);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(37,99,235,0.2);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .feature-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-desc {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* Stats strip */
+    .stats-strip {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      padding: 3rem;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .stat-item { text-align: center; }
+    .stat-number { font-size: 2.2rem; font-weight: 900; letter-spacing: -0.04em; }
+    .stat-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Portal selector */
+    .portal-section {
+      padding: 5rem 3rem;
+      text-align: center;
+      position: relative;
+      z-index: 5;
+    }
+
+    .portal-section h2 { margin-bottom: 0.75rem; }
+    .portal-section p { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 3rem; }
+
+    .portal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .portal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-xl);
+      padding: 2rem 1.5rem;
+      cursor: pointer;
+      transition: var(--transition);
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .portal-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(37,99,235,0.35);
+      box-shadow: var(--shadow-glow);
+      color: var(--text-primary);
+    }
+
+    .portal-icon { font-size: 3rem; }
+    .portal-name { font-size: 1rem; font-weight: 700; }
+    .portal-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+    /* Footer */
+    .landing-footer {
+      padding: 2rem 3rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-text { font-size: 0.8rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="landing-page">
+  <!-- Background blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <!-- Navigation -->
+  <nav class="landing-nav">
+    <div class="auth-logo" style="gap:0.75rem">
+      <div class="logo-icon">N</div>
+      <div>
+        <div class="logo-text">NexSettle</div>
+        <div class="logo-tagline">AI Claims Automation</div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="#features" class="nav-link">Features</a>
+      <a href="#portals" class="nav-link">Portals</a>
+    </div>
+    <div style="display:flex;gap:0.75rem">
+      <a href="pages/login.html" class="btn btn-outline">Sign In</a>
+      <a href="pages/register.html" class="btn btn-primary">Get Started</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      Powered by Gemini 2.5 Flash
+    </div>
+
+    <h1 class="hero-title">
+      Insurance Claims,<br />
+      <span class="text-gradient">Settled by AI.</span>
+    </h1>
+
+    <p class="hero-sub">
+      NexSettle automates the entire claim lifecycle — from document OCR and fraud detection to policy verification and settlement estimation — in seconds.
+    </p>
+
+    <div class="hero-cta">
+      <a href="pages/register.html" class="btn btn-primary btn-lg" id="cta-get-started">
+        🚀 Start a Claim
+      </a>
+      <a href="pages/login.html" class="btn btn-outline btn-lg" id="cta-sign-in">
+        Sign In to Dashboard
+      </a>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <div class="stats-strip">
+    <div class="stat-item">
+      <div class="stat-number text-gradient">98%</div>
+      <div class="stat-desc">OCR Accuracy</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number text-gradient">&lt;30s</div>
+      <div class="stat-desc">Processing Time</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number text-gradient">7+</div>
+      <div class="stat-desc">Document Types</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number text-gradient">AI</div>
+      <div class="stat-desc">Fraud Detection</div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <section id="features" class="features">
+    <h2 style="text-align:center;margin-bottom:0.75rem">The Complete AI Claims Pipeline</h2>
+    <p style="text-align:center;color:var(--text-secondary);font-size:0.9rem;margin-bottom:3rem;max-width:560px;margin-left:auto;margin-right:auto">
+      Every step from document upload to settlement recommendation is handled automatically.
+    </p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <div class="feature-title">Smart OCR</div>
+        <div class="feature-desc">Tesseract OCR extracts text from images and scanned PDFs with confidence scoring and auto-retry.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <div class="feature-title">Gemini AI Extraction</div>
+        <div class="feature-desc">Gemini 2.5 Flash intelligently extracts structured fields from 7+ document types with zero hallucination.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🚨</div>
+        <div class="feature-title">Fraud Detection</div>
+        <div class="feature-desc">Multi-signal fraud analysis covering name mismatches, format violations, date inconsistencies, and more.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">✅</div>
+        <div class="feature-title">Policy Verification</div>
+        <div class="feature-desc">Cross-checks claim data against MongoDB policy records for Aadhaar, PAN, and claim type classification.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💰</div>
+        <div class="feature-title">Claim Estimation</div>
+        <div class="feature-desc">Instant payout estimation based on claim type, sum assured, and double indemnity rules.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📄</div>
+        <div class="feature-title">PDF Reports</div>
+        <div class="feature-desc">Auto-generated professional claim settlement reports with full audit trail, downloadable as PDF.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Portal Selector -->
+  <section id="portals" class="portal-section">
+    <h2>Choose Your Portal</h2>
+    <p>Select the portal that matches your role in the claims process.</p>
+    <div class="portal-grid">
+      <a href="pages/login.html" class="portal-card" id="portal-user">
+        <div class="portal-icon">👤</div>
+        <div class="portal-name">Claimant Portal</div>
+        <div class="portal-desc">Submit and track your claim</div>
+      </a>
+      <a href="pages/agent-login.html" class="portal-card" id="portal-agent">
+        <div class="portal-icon">🕵️</div>
+        <div class="portal-name">Agent Portal</div>
+        <div class="portal-desc">Review and process claims</div>
+      </a>
+      <a href="pages/admin-login.html" class="portal-card" id="portal-admin">
+        <div class="portal-icon">⚙️</div>
+        <div class="portal-name">Admin Portal</div>
+        <div class="portal-desc">Full platform management</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="landing-footer">
+    <div class="auth-logo" style="gap:0.5rem">
+      <div class="logo-icon" style="width:28px;height:28px;font-size:0.9rem">N</div>
+      <span class="logo-text" style="font-size:1rem">NexSettle</span>
+    </div>
+    <div class="footer-text">© 2026 NexSettle. AI-Powered Insurance Claims Automation.</div>
+    <div class="footer-text">Built with Django · LangGraph · Gemini 2.5 Flash</div>
+  </footer>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+  // If already logged in, redirect to appropriate dashboard
+  const token = localStorage.getItem('nexsettle_token');
+  const role  = localStorage.getItem('nexsettle_role');
+  if (token) {
+    if      (role === 'admin') window.location.href = 'pages/admin-dashboard.html';
+    else if (role === 'agent') window.location.href = 'pages/agent-dashboard.html';
+    else                        window.location.href = 'pages/dashboard.html';
+  }
+</script>
+</body>
+</html>

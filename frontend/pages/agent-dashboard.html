@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Dashboard — NexSettle</title>
+  <meta name="description" content="NexSettle agent dashboard — review and process insurance claims." />
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">N</div>
+      <div>
+        <div class="logo-text">NexSettle</div>
+        <div class="logo-tagline">Agent Portal</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Claims</div>
+      <div class="nav-item active" data-page="queue" id="nav-queue">
+        <span class="nav-icon">📥</span> Claims Queue
+      </div>
+      <div class="nav-item" data-page="reviewed" id="nav-reviewed">
+        <span class="nav-icon">✅</span> Reviewed Claims
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar" id="sidebar-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name" id="sidebar-name">Loading…</div>
+          <div class="user-role">Agent</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost w-full mt-1" id="logout-btn" style="color:var(--danger)">
+        🚪 Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <button class="btn btn-ghost btn-icon" id="mobile-menu-btn">☰</button>
+        <h1 class="topbar-title" id="topbar-title">Claims Queue</h1>
+      </div>
+      <div class="topbar-actions">
+        <span class="badge badge-purple" id="topbar-agent-id"></span>
+        <button class="btn btn-outline btn-sm" id="refresh-btn">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- ── PAGE: Claims Queue ───────────────────────── -->
+      <div id="page-queue">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">Claims Queue</h2>
+              <p class="page-subtitle">Pending and under-review claims awaiting agent action.</p>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+              <span id="queue-count" class="badge badge-amber">Loading…</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="queue-alert" class="alert alert-error hidden mb-3">
+          <span class="alert-icon">❌</span>
+          <span id="queue-alert-msg"></span>
+        </div>
+
+        <div id="claims-queue-container">
+          <div class="empty-state">
+            <div class="spinner spinner-lg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PAGE: Reviewed Claims ────────────────────── -->
+      <div id="page-reviewed" class="hidden">
+        <div class="page-header">
+          <h2 class="page-title">Reviewed Claims</h2>
+          <p class="page-subtitle">Claims you have already reviewed (approved/rejected).</p>
+        </div>
+        <div id="reviewed-container">
+          <div class="empty-state">
+            <div class="spinner spinner-lg"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal-backdrop hidden" id="review-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📝 Review Claim</div>
+        <div class="modal-subtitle" id="review-claim-id-label">—</div>
+      </div>
+      <button class="modal-close" id="review-modal-close">✕</button>
+    </div>
+
+    <!-- Claim details section -->
+    <div id="review-claim-details" style="max-height:50vh;overflow-y:auto;margin-bottom:1rem"></div>
+
+    <div class="divider"></div>
+
+    <h4 style="margin-bottom:0.75rem;font-size:0.9rem;color:var(--text-secondary)">AGENT DECISION</h4>
+
+    <div class="form-group">
+      <label class="form-label" for="review-status">Update Status</label>
+      <select id="review-status" class="form-control">
+        <option value="under_review">Under Review</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="review-note">Review Note</label>
+      <textarea id="review-note" class="form-control" placeholder="Add your review comments here…" rows="3"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="review-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="review-submit-btn">Submit Review</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script type="module">
+  import { Agent, Reports, removeToken, getUser, getRole, isLoggedIn } from '../js/api.js';
+  import {
+    showToast, formatDateTime, formatCurrency, claimStatusBadge,
+    docTypeLabel, docTypeIcon, renderExtractedData,
+    setButtonLoading, formatConfidence, confirmDialog
+  } from '../js/ui.js';
+
+  // ── Auth guard
+  if (!isLoggedIn() || getRole() !== 'agent') {
+    window.location.href = 'agent-login.html';
+  }
+
+  const agent = getUser();
+  if (agent) {
+    document.getElementById('sidebar-name').textContent = agent.agent_name || agent.username || 'Agent';
+    document.getElementById('sidebar-avatar').textContent = (agent.agent_name || 'A')[0].toUpperCase();
+    document.getElementById('topbar-agent-id').textContent = agent.agent_id || '';
+  }
+
+  let allClaims   = [];
+  let currentClaim = null;
+
+  // ── Navigation
+  function navigate(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.add('hidden'));
+    document.getElementById(`nav-${page}`).classList.add('active');
+    document.getElementById(`page-${page}`).classList.remove('hidden');
+
+    const titles = { queue: 'Claims Queue', reviewed: 'Reviewed Claims' };
+    document.getElementById('topbar-title').textContent = titles[page] || page;
+
+    if (page === 'queue')    renderQueue();
+    if (page === 'reviewed') renderReviewed();
+  }
+
+  document.querySelectorAll('.nav-item').forEach(item =>
+    item.addEventListener('click', () => navigate(item.dataset.page)));
+
+  document.getElementById('refresh-btn').addEventListener('click', () => loadClaims());
+
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    removeToken();
+    window.location.href = 'agent-login.html';
+  });
+
+  // ── Load claims
+  async function loadClaims() {
+    const { ok, data } = await Agent.getClaims();
+    if (!ok) {
+      showToast('Error', 'Failed to load claims.', 'error');
+      return;
+    }
+    allClaims = data.claims || [];
+    renderQueue();
+  }
+
+  // ── Render Queue (pending + under_review)
+  function renderQueue() {
+    const container = document.getElementById('claims-queue-container');
+    const queueClaims = allClaims.filter(c =>
+      ['verification_pending', 'under_review'].includes(c.claim_status));
+
+    document.getElementById('queue-count').textContent = `${queueClaims.length} Pending`;
+
+    if (queueClaims.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🎉</div>
+          <div class="empty-state-title">Queue is clear!</div>
+          <div class="empty-state-desc">No claims are pending review right now.</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        ${queueClaims.map(c => renderClaimCard(c, true)).join('')}
+      </div>`;
+  }
+
+  // ── Render Reviewed
+  function renderReviewed() {
+    const container = document.getElementById('reviewed-container');
+    const done = allClaims.filter(c =>
+      !['verification_pending', 'under_review'].includes(c.claim_status));
+
+    if (done.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📭</div>
+          <div class="empty-state-title">No reviewed claims yet</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        ${done.map(c => renderClaimCard(c, false)).join('')}
+      </div>`;
+  }
+
+  // ── Claim Card HTML
+  function renderClaimCard(c, showActions) {
+    const docs = (c.extracted_documents || []);
+    const docBadges = docs.map(d =>
+      `<span class="badge badge-gray">${docTypeIcon(d.document_type)} ${docTypeLabel(d.document_type)}</span>`
+    ).join(' ');
+
+    return `
+      <div class="card" style="border-left: 3px solid ${c.fraud_flag ? 'var(--danger)' : 'var(--primary)'}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+          <div>
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.5rem">
+              <span class="font-mono" style="font-size:0.85rem;font-weight:700">${c.claim_id}</span>
+              ${claimStatusBadge(c.claim_status)}
+              ${c.fraud_flag ? '<span class="badge badge-red">🚨 Fraud</span>' : '<span class="badge badge-green">✅ Clean</span>'}
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem">${docBadges}</div>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+              <div class="text-sm muted">👤 <strong>${c.user_unique_id}</strong></div>
+              <div class="text-sm muted">📅 ${formatDateTime(c.created_at)}</div>
+              <div class="text-sm muted">💰 ${formatCurrency(c.estimated_claim_amount)}</div>
+              <div class="text-sm muted">📊 ${formatConfidence(c.overall_confidence || 0)} confidence</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="window.downloadReport('${c.claim_id}')">⬇ Report</button>
+            ${showActions ? `<button class="btn btn-primary btn-sm" onclick="openReviewModal('${c.claim_id}')">📝 Review</button>` : ''}
+          </div>
+        </div>
+        ${c.fraud_flag && c.fraud_reasons?.length ? `
+          <div style="margin-top:0.75rem;padding:0.75rem;background:var(--danger-light);border-radius:var(--radius-md);font-size:0.78rem">
+            <strong style="color:#f87171">Fraud Signals:</strong>
+            ${c.fraud_reasons.map(r => `<div style="color:var(--text-secondary);margin-top:0.2rem">• ${r}</div>`).join('')}
+          </div>` : ''}
+        ${c.agent_review_note ? `
+          <div style="margin-top:0.75rem;padding:0.75rem;background:rgba(37,99,235,0.08);border-radius:var(--radius-md);font-size:0.8rem">
+            <strong style="color:var(--primary-light)">Agent Note:</strong>
+            <div style="color:var(--text-secondary);margin-top:0.2rem">${c.agent_review_note}</div>
+          </div>` : ''}
+      </div>`;
+  }
+
+  // ── Review Modal
+  window.openReviewModal = function(claimId) {
+    currentClaim = allClaims.find(c => c.claim_id === claimId);
+    if (!currentClaim) return;
+
+    document.getElementById('review-claim-id-label').textContent = `Claim: ${claimId}`;
+    document.getElementById('review-note').value = '';
+    document.getElementById('review-status').value = 'under_review';
+
+    const docs = (currentClaim.extracted_documents || []);
+    let detailsHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;font-size:0.85rem">
+        <div><span class="muted">User:</span> <strong>${currentClaim.user_unique_id}</strong></div>
+        <div><span class="muted">Claim Type:</span> <strong>${(currentClaim.claim_type || 'unknown').replace('_',' ')}</strong></div>
+        <div><span class="muted">Fraud Flag:</span> ${currentClaim.fraud_flag ? '<span class="badge badge-red">🚨 Yes</span>' : '<span class="badge badge-green">✅ No</span>'}</div>
+        <div><span class="muted">Payout:</span> <strong style="color:var(--success)">${formatCurrency(currentClaim.estimated_claim_amount)}</strong></div>
+      </div>`;
+
+    if (docs.length) {
+      detailsHtml += `<h4 style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Extracted Documents</h4>`;
+      docs.forEach(doc => {
+        detailsHtml += `
+          <div style="margin-bottom:0.75rem">
+            <div style="font-weight:600;font-size:0.875rem;margin-bottom:0.35rem">
+              ${docTypeIcon(doc.document_type)} ${docTypeLabel(doc.document_type)}
+              <span class="badge badge-gray" style="margin-left:0.5rem">${formatConfidence(doc.confidence_score)}</span>
+            </div>
+            ${renderExtractedData(doc.extracted_data)}
+          </div>`;
+      });
+    }
+
+    document.getElementById('review-claim-details').innerHTML = detailsHtml;
+    document.getElementById('review-modal').classList.remove('hidden');
+  };
+
+  document.getElementById('review-modal-close').addEventListener('click', closeReviewModal);
+  document.getElementById('review-cancel-btn').addEventListener('click', closeReviewModal);
+
+  document.getElementById('review-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('review-modal')) closeReviewModal();
+  });
+
+  function closeReviewModal() {
+    document.getElementById('review-modal').classList.add('hidden');
+    currentClaim = null;
+  }
+
+  document.getElementById('review-submit-btn').addEventListener('click', async () => {
+    if (!currentClaim) return;
+
+    const btn = document.getElementById('review-submit-btn');
+    const note   = document.getElementById('review-note').value.trim();
+    const status = document.getElementById('review-status').value;
+
+    if (!note) {
+      showToast('Note Required', 'Please add a review note before submitting.', 'warning');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Submitting…');
+    const { ok, data } = await Agent.reviewClaim(currentClaim.claim_id, note, status);
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      showToast('Error', data?.error || 'Review submission failed.', 'error');
+      return;
+    }
+
+    showToast('Review Submitted', `Claim ${currentClaim.claim_id} → ${status}`, 'success');
+    closeReviewModal();
+    await loadClaims();
+  });
+
+  // ── Download Report
+  window.downloadReport = async function(claimId) {
+    showToast('Generating Report', 'Please wait…', 'info', 3000);
+    const { ok, data, isBlob } = await Reports.downloadReport(claimId);
+    if (!ok || !isBlob) { showToast('Error', 'Could not generate report.', 'error'); return; }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${claimId}_NexSettle_Report.pdf`; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Downloaded!', `${claimId} report is ready.`, 'success');
+  };
+
+  // ── Mobile menu
+  document.getElementById('mobile-menu-btn').addEventListener('click', () =>
+    document.getElementById('sidebar').classList.toggle('open'));
+
+  // ── Init
+  await loadClaims();
+  navigate('queue');
+</script>
+</body>
+</html>

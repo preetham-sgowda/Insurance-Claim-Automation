@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — NexSettle</title>
+  <meta name="description" content="NexSettle admin dashboard — platform oversight and management." />
+  <link rel="stylesheet" href="../css/main.css" />
+  <style>
+    .admin-stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      transition: var(--transition);
+    }
+    .admin-stat-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(37,99,235,0.25);
+      box-shadow: var(--shadow-card);
+    }
+    .admin-stat-icon {
+      width: 52px; height: 52px;
+      border-radius: var(--radius-md);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; flex-shrink: 0;
+    }
+    .admin-stat-body { flex: 1; }
+    .admin-stat-value { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+    .admin-stat-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .filter-bar {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .filter-bar .form-control {
+      width: auto;
+      min-width: 160px;
+      padding: 0.55rem 0.875rem;
+      font-size: 0.85rem;
+    }
+
+    .claim-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+    }
+
+    .pagination .btn { min-width: 36px; }
+    .pagination .page-info { font-size: 0.875rem; color: var(--text-secondary); padding: 0 0.5rem; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">N</div>
+      <div>
+        <div class="logo-text">NexSettle</div>
+        <div class="logo-tagline">Admin Panel</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Platform</div>
+      <div class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <span class="nav-icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" data-page="claims" id="nav-claims">
+        <span class="nav-icon">📋</span> All Claims
+      </div>
+      <div class="nav-item" data-page="fraud" id="nav-fraud">
+        <span class="nav-icon">🚨</span> Fraud Cases
+      </div>
+
+      <div class="nav-section-label" style="margin-top:1rem">Management</div>
+      <div class="nav-item" data-page="agents" id="nav-agents">
+        <span class="nav-icon">🕵️</span> Agents
+      </div>
+      <div class="nav-item" data-page="policy" id="nav-policy">
+        <span class="nav-icon">📑</span> Policy Holders
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar" id="sidebar-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name" id="sidebar-name">Admin</div>
+          <div class="user-role">Administrator</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost w-full mt-1" id="logout-btn" style="color:var(--danger)">
+        🚪 Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <button class="btn btn-ghost btn-icon" id="mobile-menu-btn">☰</button>
+        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+      </div>
+      <div class="topbar-actions">
+        <span class="badge badge-purple" id="topbar-admin-id"></span>
+        <button class="btn btn-outline btn-sm" id="refresh-btn">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- ── PAGE: Dashboard ────────────────────────── -->
+      <div id="page-dashboard">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Platform Overview</h2>
+            <p class="page-subtitle" id="dashboard-greeting">Welcome back, Admin.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-4 gap-2 mb-4" id="stats-grid">
+          <!-- Filled dynamically -->
+          <div class="admin-stat-card"><div class="skeleton" style="width:100%;height:60px"></div></div>
+          <div class="admin-stat-card"><div class="skeleton" style="width:100%;height:60px"></div></div>
+          <div class="admin-stat-card"><div class="skeleton" style="width:100%;height:60px"></div></div>
+          <div class="admin-stat-card"><div class="skeleton" style="width:100%;height:60px"></div></div>
+        </div>
+
+        <div class="grid grid-2 gap-3">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Recent Claims</h3>
+              <button class="btn btn-outline btn-sm" onclick="navigate('claims')">View All</button>
+            </div>
+            <div id="dashboard-recent-claims">
+              <div class="empty-state"><div class="spinner spinner-lg"></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">🚨 Recent Fraud Cases</h3>
+              <button class="btn btn-outline btn-sm" onclick="navigate('fraud')">View All</button>
+            </div>
+            <div id="dashboard-fraud-list">
+              <div class="empty-state"><div class="spinner spinner-lg"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PAGE: All Claims ────────────────────────── -->
+      <div id="page-claims" class="hidden">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">All Claims</h2>
+              <p class="page-subtitle">Complete claims register with full admin actions.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <select id="filter-status" class="form-control">
+            <option value="">All Statuses</option>
+            <option value="verification_pending">Pending</option>
+            <option value="under_review">Under Review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="fraud_detected">Fraud Detected</option>
+            <option value="settled">Settled</option>
+          </select>
+          <select id="filter-fraud" class="form-control">
+            <option value="">All</option>
+            <option value="false">Clean Only</option>
+            <option value="true">Fraud Only</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="apply-filters-btn">Apply Filters</button>
+          <button class="btn btn-outline btn-sm" id="clear-filters-btn">Clear</button>
+        </div>
+
+        <div class="card">
+          <div id="all-claims-container">
+            <div class="empty-state"><div class="spinner spinner-lg"></div></div>
+          </div>
+          <div class="pagination" id="all-claims-pagination"></div>
+        </div>
+      </div>
+
+      <!-- ── PAGE: Fraud Cases ──────────────────────── -->
+      <div id="page-fraud" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">🚨 Fraud Cases</h2>
+            <p class="page-subtitle">Claims flagged by the AI fraud detection system.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div id="fraud-cases-container">
+            <div class="empty-state"><div class="spinner spinner-lg"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PAGE: Agents ─────────────────────────── -->
+      <div id="page-agents" class="hidden">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">Agent Management</h2>
+              <p class="page-subtitle">Create and manage agent accounts.</p>
+            </div>
+            <button class="btn btn-primary" id="create-agent-btn">+ Create Agent</button>
+          </div>
+        </div>
+
+        <div class="alert alert-info mb-3">
+          <span class="alert-icon">ℹ️</span>
+          <span>Agents can log in at <strong>agent-login.html</strong> using the credentials you create here.</span>
+        </div>
+
+        <div class="card" id="agent-create-form-card" style="max-width:480px;margin-bottom:1.5rem;display:none">
+          <h3 class="card-title mb-3">Create New Agent</h3>
+          <div class="form-group">
+            <label class="form-label" for="agent-name">Full Name</label>
+            <input id="agent-name" type="text" class="form-control" placeholder="Agent Full Name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="agent-email">Email</label>
+            <input id="agent-email" type="email" class="form-control" placeholder="agent@nexsettle.org" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="agent-password">Password</label>
+            <input id="agent-password" type="password" class="form-control" placeholder="Minimum 8 characters" />
+          </div>
+          <div id="agent-form-alert" class="alert alert-error hidden mb-2">
+            <span class="alert-icon">❌</span>
+            <span id="agent-form-alert-msg"></span>
+          </div>
+          <div style="display:flex;gap:0.75rem">
+            <button class="btn btn-primary" id="agent-create-submit-btn">Create Agent</button>
+            <button class="btn btn-outline" id="agent-create-cancel-btn">Cancel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">All Agents</h3>
+            <button class="btn btn-outline btn-sm" id="refresh-agents-btn">🔄 Refresh</button>
+          </div>
+          <div id="agents-list-container">
+            <div class="empty-state"><div class="spinner spinner-lg"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PAGE: Policy Holders ───────────────────── -->
+      <div id="page-policy" class="hidden">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">📑 Policy Holders</h2>
+              <p class="page-subtitle">Manage pre-existing policy holder records used for claim verification.</p>
+            </div>
+            <button class="btn btn-primary" id="add-policy-btn">+ Add Record</button>
+          </div>
+        </div>
+
+        <div class="card" id="policy-form-card" style="max-width:600px;margin-bottom:1.5rem;display:none">
+          <h3 class="card-title mb-3">Add / Update Policy Holder</h3>
+          <div class="grid grid-2 gap-2">
+            <div class="form-group">
+              <label class="form-label" for="ph-user-id">User Unique ID</label>
+              <input id="ph-user-id" type="text" class="form-control" placeholder="USR_0001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ph-policy-num">Policy Number</label>
+              <input id="ph-policy-num" type="text" class="form-control" placeholder="POL123456" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ph-aadhaar">Aadhaar (masked/last 4)</label>
+              <input id="ph-aadhaar" type="text" class="form-control" placeholder="********1234" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ph-pan">PAN (masked/last 5)</label>
+              <input id="ph-pan" type="text" class="form-control" placeholder="*****1234F" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ph-sum">Sum Assured (₹)</label>
+              <input id="ph-sum" type="number" class="form-control" placeholder="1000000" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ph-medical">Medical History</label>
+              <input id="ph-medical" type="text" class="form-control" placeholder="None / Hypertension…" />
+            </div>
+          </div>
+          <div id="policy-form-alert" class="alert alert-error hidden mb-2">
+            <span class="alert-icon">❌</span>
+            <span id="policy-form-alert-msg"></span>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:0.5rem">
+            <button class="btn btn-primary" id="policy-save-btn">Save Record</button>
+            <button class="btn btn-outline" id="policy-cancel-btn">Cancel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">All Policy Holders</h3>
+            <button class="btn btn-outline btn-sm" id="refresh-policy-btn">🔄 Refresh</button>
+          </div>
+          <div id="policy-list-container">
+            <div class="empty-state"><div class="spinner spinner-lg"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div><!-- /main-content -->
+</div>
+
+<!-- Claim Detail / Action Modal -->
+<div class="modal-backdrop hidden" id="claim-action-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="action-modal-title">Claim Details</div>
+        <div class="modal-subtitle" id="action-modal-subtitle"></div>
+      </div>
+      <button class="modal-close" id="action-modal-close">✕</button>
+    </div>
+    <div id="action-modal-body" style="max-height:55vh;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="action-modal-cancel">Close</button>
+      <button class="btn btn-success" id="action-approve-btn">✅ Approve</button>
+      <button class="btn btn-primary" id="action-settle-btn" style="background:var(--success)">💰 Settle</button>
+      <button class="btn btn-danger" id="action-reject-btn">❌ Reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Reason Modal -->
+<div class="modal-backdrop hidden" id="reject-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">❌ Reject Claim</div>
+      <button class="modal-close" id="reject-modal-close">✕</button>
+    </div>
+    <div class="form-group mt-2">
+      <label class="form-label" for="reject-reason">Rejection Reason</label>
+      <textarea id="reject-reason" class="form-control" rows="4" placeholder="Explain the reason for rejection…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="reject-cancel-btn">Cancel</button>
+      <button class="btn btn-danger" id="reject-confirm-btn">Confirm Rejection</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script type="module">
+  import { Admin, Reports, removeToken, getUser, getRole, isLoggedIn } from '../js/api.js';
+  import {
+    showToast, formatDateTime, formatCurrency, claimStatusBadge,
+    docTypeLabel, docTypeIcon, renderExtractedData,
+    setButtonLoading, formatConfidence
+  } from '../js/ui.js';
+
+  // ── Auth guard
+  if (!isLoggedIn() || getRole() !== 'admin') {
+    window.location.href = 'admin-login.html';
+  }
+
+  const adminUser = getUser();
+  if (adminUser) {
+    document.getElementById('sidebar-name').textContent = adminUser.name || adminUser.username || 'Admin';
+    document.getElementById('sidebar-avatar').textContent = (adminUser.name || 'A')[0].toUpperCase();
+    document.getElementById('topbar-admin-id').textContent = adminUser.admin_id || '';
+    document.getElementById('dashboard-greeting').textContent =
+      `Welcome back, ${adminUser.name || 'Admin'}. Here's your platform overview.`;
+  }
+
+  let currentActionClaim = null;
+  let allClaims = [];
+  let claimsPage = 1;
+  const PAGE_LIMIT = 15;
+
+  // ── Navigation
+  window.navigate = function(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.add('hidden'));
+    const navEl = document.getElementById(`nav-${page}`);
+    if (navEl) navEl.classList.add('active');
+    const pageEl = document.getElementById(`page-${page}`);
+    if (pageEl) pageEl.classList.remove('hidden');
+
+    const titles = {
+      dashboard: 'Dashboard', claims: 'All Claims',
+      fraud: 'Fraud Cases', agents: 'Agent Management',
+      policy: 'Policy Holders',
+    };
+    document.getElementById('topbar-title').textContent = titles[page] || page;
+
+    if (page === 'dashboard') loadDashboard();
+    if (page === 'claims')    loadAllClaims();
+    if (page === 'fraud')     loadFraudCases();
+    if (page === 'agents')    loadAgents();
+    if (page === 'policy')    loadPolicyHolders();
+  };
+
+  document.querySelectorAll('.nav-item').forEach(item =>
+    item.addEventListener('click', () => navigate(item.dataset.page)));
+
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    const activePage = document.querySelector('.nav-item.active')?.dataset?.page || 'dashboard';
+    navigate(activePage);
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    removeToken();
+    window.location.href = 'admin-login.html';
+  });
+
+  // ── Dashboard
+  async function loadDashboard() {
+    const { ok, data } = await Admin.getDashboard();
+    if (!ok) { showToast('Error', 'Failed to load dashboard.', 'error'); return; }
+
+    const stats = [
+      { icon: '📋', label: 'Total Claims',    value: data.total_claims,   cls: 'blue' },
+      { icon: '⏳', label: 'Pending',          value: data.pending_claims,  cls: 'amber' },
+      { icon: '✅', label: 'Approved',          value: data.approved_claims, cls: 'green' },
+      { icon: '🚨', label: 'Fraud Cases',       value: data.fraud_claims,   cls: 'red' },
+      { icon: '💰', label: 'Settled',           value: data.settled_claims,  cls: 'cyan' },
+      { icon: '👤', label: 'Total Users',        value: data.total_users,     cls: 'purple' },
+      { icon: '🕵️', label: 'Agents',            value: data.total_agents,    cls: 'blue' },
+    ];
+
+    // Render stats (show first 4 in grid, rest hidden)
+    document.getElementById('stats-grid').innerHTML = stats.slice(0, 7).map(s => `
+      <div class="admin-stat-card">
+        <div class="admin-stat-icon ${s.cls}">${s.icon}</div>
+        <div class="admin-stat-body">
+          <div class="admin-stat-value">${s.value ?? 0}</div>
+          <div class="admin-stat-label">${s.label}</div>
+        </div>
+      </div>`).join('');
+
+    // Update grid for 7 items
+    document.getElementById('stats-grid').style.gridTemplateColumns = 'repeat(auto-fit, minmax(160px, 1fr))';
+
+    // Recent claims
+    const { ok: cok, data: cdata } = await Admin.getClaims({ limit: 5 });
+    const recentClaims = cok ? (cdata.claims || []) : [];
+    document.getElementById('dashboard-recent-claims').innerHTML = recentClaims.length
+      ? `<div style="display:flex;flex-direction:column;gap:0.75rem">
+          ${recentClaims.map(c => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0;border-bottom:1px solid var(--border);font-size:0.82rem">
+              <div>
+                <span class="font-mono" style="font-weight:600">${c.claim_id}</span>
+                <span class="muted" style="margin-left:0.5rem">${c.user_unique_id}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                ${claimStatusBadge(c.claim_status)}
+                <button class="btn btn-ghost btn-sm" onclick="openClaimModal('${c.claim_id}')">View</button>
+              </div>
+            </div>`).join('')}
+         </div>`
+      : `<div class="empty-state" style="padding:1.5rem"><div class="empty-state-desc">No claims yet.</div></div>`;
+
+    // Fraud cases
+    const { ok: fok, data: fdata } = await Admin.getClaims({ fraud: 'true', limit: 5 });
+    const fraudClaims = fok ? (fdata.claims || []) : [];
+    document.getElementById('dashboard-fraud-list').innerHTML = fraudClaims.length
+      ? `<div style="display:flex;flex-direction:column;gap:0.75rem">
+          ${fraudClaims.map(c => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0;border-bottom:1px solid var(--border);font-size:0.82rem">
+              <div>
+                <span class="font-mono" style="font-weight:600">${c.claim_id}</span>
+                <div class="muted" style="margin-top:2px;font-size:0.75rem">${(c.fraud_reasons || []).slice(0,1).join('')}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <span class="badge badge-red">🚨 Fraud</span>
+                <button class="btn btn-ghost btn-sm" onclick="openClaimModal('${c.claim_id}')">View</button>
+              </div>
+            </div>`).join('')}
+         </div>`
+      : `<div class="empty-state" style="padding:1.5rem"><div class="empty-state-icon">✅</div><div class="empty-state-desc">No fraud cases.</div></div>`;
+  }
+
+  // ── All Claims
+  async function loadAllClaims(page = 1) {
+    claimsPage = page;
+    const container = document.getElementById('all-claims-container');
+    container.innerHTML = `<div class="empty-state"><div class="spinner spinner-lg"></div></div>`;
+
+    const status = document.getElementById('filter-status').value;
+    const fraud  = document.getElementById('filter-fraud').value;
+    const params = { page, limit: PAGE_LIMIT };
+    if (status) params.status = status;
+    if (fraud !== '') params.fraud = fraud;
+
+    const { ok, data } = await Admin.getClaims(params);
+    if (!ok) { container.innerHTML = `<div class="empty-state">Failed to load claims.</div>`; return; }
+
+    const claims = data.claims || [];
+    allClaims = claims;
+
+    if (claims.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No claims match the filters.</div></div>`;
+      document.getElementById('all-claims-pagination').innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-wrapper">
+        <table class="nexsettle-table">
+          <thead><tr>
+            <th>Claim ID</th><th>User</th><th>Type</th><th>Status</th><th>Fraud</th>
+            <th>Confidence</th><th>Payout</th><th>Date</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${claims.map(c => `
+              <tr>
+                <td class="font-mono" style="font-size:0.78rem">${c.claim_id}</td>
+                <td class="text-sm">${c.user_unique_id}</td>
+                <td class="text-sm">${(c.claim_type || 'unknown').replace('_',' ')}</td>
+                <td>${claimStatusBadge(c.claim_status)}</td>
+                <td>${c.fraud_flag ? '<span class="badge badge-red">🚨 Yes</span>' : '<span class="badge badge-green">✅ No</span>'}</td>
+                <td class="text-sm font-mono">${formatConfidence(c.overall_confidence || 0)}</td>
+                <td class="text-sm">${formatCurrency(c.estimated_claim_amount)}</td>
+                <td class="text-sm muted">${formatDateTime(c.created_at)}</td>
+                <td>
+                  <div class="claim-actions">
+                    <button class="btn btn-outline btn-sm" onclick="openClaimModal('${c.claim_id}')">View</button>
+                    <button class="btn btn-ghost btn-sm" onclick="window.downloadReport('${c.claim_id}')">⬇</button>
+                  </div>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    // Pagination
+    const total = data.total || 0;
+    const totalPages = Math.ceil(total / PAGE_LIMIT);
+    renderPagination(page, totalPages);
+  }
+
+  function renderPagination(current, total) {
+    const el = document.getElementById('all-claims-pagination');
+    if (total <= 1) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+      <button class="btn btn-outline btn-sm" ${current <= 1 ? 'disabled' : ''}
+        onclick="loadAllClaims(${current - 1})">← Prev</button>
+      <span class="page-info">Page ${current} of ${total}</span>
+      <button class="btn btn-outline btn-sm" ${current >= total ? 'disabled' : ''}
+        onclick="loadAllClaims(${current + 1})">Next →</button>
+    `;
+  }
+
+  document.getElementById('apply-filters-btn').addEventListener('click', () => loadAllClaims(1));
+  document.getElementById('clear-filters-btn').addEventListener('click', () => {
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-fraud').value = '';
+    loadAllClaims(1);
+  });
+
+  // ── Fraud Cases
+  async function loadFraudCases() {
+    const container = document.getElementById('fraud-cases-container');
+    container.innerHTML = `<div class="empty-state"><div class="spinner spinner-lg"></div></div>`;
+
+    const { ok, data } = await Admin.getClaims({ fraud: 'true', limit: 50 });
+    if (!ok) { container.innerHTML = `<div class="empty-state">Failed to load fraud cases.</div>`; return; }
+
+    const claims = data.claims || [];
+    if (claims.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">No fraud cases detected!</div></div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        ${claims.map(c => `
+          <div class="card" style="border-left:3px solid var(--danger)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem">
+              <div>
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;flex-wrap:wrap">
+                  <span class="font-mono" style="font-weight:700;font-size:0.875rem">${c.claim_id}</span>
+                  ${claimStatusBadge(c.claim_status)}
+                  <span class="badge badge-red">🚨 Fraud Detected</span>
+                </div>
+                <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.5rem">
+                  User: <strong>${c.user_unique_id}</strong> · Submitted: ${formatDateTime(c.created_at)}
+                </div>
+                <div style="background:var(--danger-light);border-radius:var(--radius-md);padding:0.75rem;font-size:0.78rem">
+                  <strong style="color:#f87171">Fraud Signals (${(c.fraud_reasons || []).length}):</strong>
+                  ${(c.fraud_reasons || []).map(r => `<div style="color:var(--text-secondary);margin-top:0.2rem">• ${r}</div>`).join('')}
+                </div>
+              </div>
+              <div style="display:flex;gap:0.5rem;flex-direction:column">
+                <button class="btn btn-outline btn-sm" onclick="openClaimModal('${c.claim_id}')">View Details</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectClaim('${c.claim_id}')">Reject Claim</button>
+                <button class="btn btn-ghost btn-sm" onclick="window.downloadReport('${c.claim_id}')">⬇ Report</button>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  // ── Claim Detail Modal
+  window.openClaimModal = async function(claimId) {
+    // Find in loaded or fetch
+    let claim = allClaims.find(c => c.claim_id === claimId);
+
+    const modal = document.getElementById('claim-action-modal');
+    document.getElementById('action-modal-title').textContent = `Claim: ${claimId}`;
+    document.getElementById('action-modal-subtitle').textContent = claim
+      ? `${(claim.claim_type || '').replace('_', ' ')} · ${claim.user_unique_id}`
+      : claimId;
+
+    if (!claim) {
+      document.getElementById('action-modal-body').innerHTML = `<div class="empty-state"><div class="spinner spinner-lg"></div></div>`;
+    }
+
+    modal.classList.remove('hidden');
+    currentActionClaim = claim || { claim_id: claimId };
+
+    if (!claim) return;
+
+    const docs = claim.extracted_documents || [];
+    const docsHtml = docs.map(doc => `
+      <div style="margin-bottom:0.75rem">
+        <div style="font-weight:600;font-size:0.875rem;margin-bottom:0.35rem;display:flex;align-items:center;gap:0.5rem">
+          ${docTypeIcon(doc.document_type)} ${docTypeLabel(doc.document_type)}
+          <span class="badge badge-gray">${formatConfidence(doc.confidence_score)}</span>
+        </div>
+        ${renderExtractedData(doc.extracted_data)}
+      </div>`).join('');
+
+    document.getElementById('action-modal-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;font-size:0.85rem">
+        <div><span class="muted">User ID:</span> <strong>${claim.user_unique_id}</strong></div>
+        <div><span class="muted">Policy #:</span> <strong>${claim.policy_number || '—'}</strong></div>
+        <div><span class="muted">Claim Type:</span> <strong>${(claim.claim_type || 'unknown').replace('_',' ')}</strong></div>
+        <div><span class="muted">Status:</span> ${claimStatusBadge(claim.claim_status)}</div>
+        <div><span class="muted">Fraud Flag:</span> ${claim.fraud_flag ? '<span class="badge badge-red">🚨 Yes</span>' : '<span class="badge badge-green">✅ No</span>'}</div>
+        <div><span class="muted">Payout:</span> <strong style="color:var(--success)">${formatCurrency(claim.estimated_claim_amount)}</strong></div>
+        <div><span class="muted">Confidence:</span> <strong>${formatConfidence(claim.overall_confidence || 0)}</strong></div>
+        <div><span class="muted">Submitted:</span> ${formatDateTime(claim.created_at)}</div>
+      </div>
+      ${claim.fraud_flag && claim.fraud_reasons?.length ? `
+        <div style="margin-bottom:1rem;padding:0.75rem;background:var(--danger-light);border-radius:var(--radius-md);font-size:0.8rem">
+          <strong style="color:#f87171">Fraud Signals:</strong>
+          ${claim.fraud_reasons.map(r => `<div style="color:var(--text-secondary);margin-top:0.15rem">• ${r}</div>`).join('')}
+        </div>` : ''}
+      <h4 style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Extracted Documents</h4>
+      ${docsHtml || '<div class="muted text-sm">No documents found.</div>'}
+      ${claim.agent_review_note ? `
+        <div style="margin-top:0.75rem;padding:0.75rem;background:rgba(37,99,235,0.08);border-radius:var(--radius-md);font-size:0.8rem">
+          <strong style="color:var(--primary-light)">Agent Note:</strong>
+          <div style="color:var(--text-secondary);margin-top:0.25rem">${claim.agent_review_note}</div>
+        </div>` : ''}
+    `;
+  };
+
+  document.getElementById('action-modal-close').addEventListener('click', () => {
+    document.getElementById('claim-action-modal').classList.add('hidden');
+  });
+  document.getElementById('action-modal-cancel').addEventListener('click', () => {
+    document.getElementById('claim-action-modal').classList.add('hidden');
+  });
+
+  document.getElementById('action-approve-btn').addEventListener('click', async () => {
+    if (!currentActionClaim) return;
+    const btn = document.getElementById('action-approve-btn');
+    setButtonLoading(btn, true, 'Approving…');
+    const { ok } = await Admin.approveClaim(currentActionClaim.claim_id);
+    setButtonLoading(btn, false);
+    if (ok) {
+      showToast('Claim Approved', currentActionClaim.claim_id, 'success');
+      document.getElementById('claim-action-modal').classList.add('hidden');
+      await loadAllClaims(claimsPage);
+    } else {
+      showToast('Error', 'Approval failed.', 'error');
+    }
+  });
+
+  document.getElementById('action-reject-btn').addEventListener('click', () => {
+    document.getElementById('claim-action-modal').classList.add('hidden');
+    openRejectModal(currentActionClaim?.claim_id);
+  });
+
+  // ── Reject Modal
+  function openRejectModal(claimId) {
+    document.getElementById('reject-reason').value = '';
+    document.getElementById('reject-modal').classList.remove('hidden');
+    currentActionClaim = currentActionClaim || { claim_id: claimId };
+  }
+
+  window.rejectClaim = function(claimId) {
+    currentActionClaim = { claim_id: claimId };
+    openRejectModal(claimId);
+  };
+
+  document.getElementById('reject-modal-close').addEventListener('click', () => {
+    document.getElementById('reject-modal').classList.add('hidden');
+  });
+  document.getElementById('reject-cancel-btn').addEventListener('click', () => {
+    document.getElementById('reject-modal').classList.add('hidden');
+  });
+
+  document.getElementById('reject-confirm-btn').addEventListener('click', async () => {
+    if (!currentActionClaim) return;
+    const reason = document.getElementById('reject-reason').value.trim();
+    const btn = document.getElementById('reject-confirm-btn');
+    setButtonLoading(btn, true, 'Rejecting…');
+    const { ok } = await Admin.rejectClaim(currentActionClaim.claim_id, reason);
+    setButtonLoading(btn, false);
+    if (ok) {
+      showToast('Claim Rejected', currentActionClaim.claim_id, 'warning');
+      document.getElementById('reject-modal').classList.add('hidden');
+      await loadAllClaims(claimsPage);
+    } else {
+      showToast('Error', 'Rejection failed.', 'error');
+    }
+  });
+
+  // ── Agent Management
+  document.getElementById('create-agent-btn').addEventListener('click', () => {
+    const formCard = document.getElementById('agent-create-form-card');
+    formCard.style.display = formCard.style.display === 'none' ? 'block' : 'none';
+  });
+
+  document.getElementById('agent-create-cancel-btn').addEventListener('click', () => {
+    document.getElementById('agent-create-form-card').style.display = 'none';
+  });
+
+  document.getElementById('agent-create-submit-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('agent-create-submit-btn');
+    const alertEl  = document.getElementById('agent-form-alert');
+    const alertMsg = document.getElementById('agent-form-alert-msg');
+    alertEl.classList.add('hidden');
+
+    const name     = document.getElementById('agent-name').value.trim();
+    const email    = document.getElementById('agent-email').value.trim();
+    const password = document.getElementById('agent-password').value;
+
+    if (!name || !email || !password) {
+      alertMsg.textContent = 'All fields are required.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Creating…');
+    const { ok, data } = await Admin.createAgent(name, email, password);
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      alertMsg.textContent = data?.error || 'Failed to create agent.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('agent-name').value = '';
+    document.getElementById('agent-email').value = '';
+    document.getElementById('agent-password').value = '';
+    document.getElementById('agent-create-form-card').style.display = 'none';
+    showToast('Agent Created!', `${data.agent_id} — ${data.agent_email}`, 'success', 5000);
+    loadAgents();
+  });
+
+  // ── Load Agents List
+  async function loadAgents() {
+    const container = document.getElementById('agents-list-container');
+    container.innerHTML = `<div class="empty-state"><div class="spinner spinner-lg"></div></div>`;
+
+    const { ok, data } = await Admin.getAgents();
+    if (!ok) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-desc">Failed to load agents.</div></div>`;
+      return;
+    }
+
+    const agents = data.agents || [];
+    if (agents.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🕵️</div><div class="empty-state-title">No agents yet</div><div class="empty-state-desc">Create the first agent using the button above.</div></div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-wrapper">
+        <table class="nexsettle-table">
+          <thead><tr>
+            <th>Agent ID</th><th>Name</th><th>Email</th><th>Created</th>
+          </tr></thead>
+          <tbody>
+            ${agents.map(a => `
+              <tr>
+                <td class="font-mono" style="font-size:0.82rem">${a.agent_id}</td>
+                <td>${a.agent_name}</td>
+                <td>${a.agent_email}</td>
+                <td class="text-sm muted">${formatDateTime(a.created_at)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  document.getElementById('refresh-agents-btn').addEventListener('click', loadAgents);
+
+  // ── Load Policy Holders
+  async function loadPolicyHolders(userId = null) {
+    const container = document.getElementById('policy-list-container');
+    container.innerHTML = `<div class="empty-state"><div class="spinner spinner-lg"></div></div>`;
+
+    const { ok, data } = await Admin.getPolicyHolders(userId);
+    if (!ok) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-desc">Failed to load policy holders.</div></div>`;
+      return;
+    }
+
+    const records = data.records || [];
+    if (records.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📑</div><div class="empty-state-title">No records yet</div><div class="empty-state-desc">Add policy holder records using the button above.</div></div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-wrapper">
+        <table class="nexsettle-table">
+          <thead><tr>
+            <th>User ID</th><th>Policy #</th><th>Aadhaar</th><th>PAN</th><th>Sum Assured</th><th>Medical History</th>
+          </tr></thead>
+          <tbody>
+            ${records.map(r => `
+              <tr>
+                <td class="font-mono" style="font-size:0.82rem">${r.user_unique_id}</td>
+                <td>${r.policy_number || '—'}</td>
+                <td class="font-mono text-sm">${r.aadhaar_id || '—'}</td>
+                <td class="font-mono text-sm">${r.pan_id || '—'}</td>
+                <td>₹${Number(r.sum_assured || 0).toLocaleString('en-IN')}</td>
+                <td class="text-sm">${r.medical_history || '—'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  document.getElementById('refresh-policy-btn').addEventListener('click', () => loadPolicyHolders());
+
+  // ── Policy Holder Form
+  document.getElementById('add-policy-btn').addEventListener('click', () => {
+    const formCard = document.getElementById('policy-form-card');
+    formCard.style.display = formCard.style.display === 'none' ? 'block' : 'none';
+  });
+
+  document.getElementById('policy-cancel-btn').addEventListener('click', () => {
+    document.getElementById('policy-form-card').style.display = 'none';
+  });
+
+  document.getElementById('policy-save-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('policy-save-btn');
+    const alertEl  = document.getElementById('policy-form-alert');
+    const alertMsg = document.getElementById('policy-form-alert-msg');
+    alertEl.classList.add('hidden');
+
+    const payload = {
+      user_unique_id: document.getElementById('ph-user-id').value.trim(),
+      policy_number:  document.getElementById('ph-policy-num').value.trim(),
+      aadhaar_id:     document.getElementById('ph-aadhaar').value.trim(),
+      pan_id:         document.getElementById('ph-pan').value.trim(),
+      sum_assured:    Number(document.getElementById('ph-sum').value) || 1000000,
+      medical_history: document.getElementById('ph-medical').value.trim(),
+    };
+
+    if (!payload.user_unique_id || !payload.policy_number) {
+      alertMsg.textContent = 'User Unique ID and Policy Number are required.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    setButtonLoading(btn, true, 'Saving…');
+    const { ok, data } = await Admin.addPolicyHolder(payload);
+    setButtonLoading(btn, false);
+
+    if (!ok) {
+      alertMsg.textContent = data?.error || 'Failed to save policy holder.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+
+    showToast('Record Saved', `Policy holder ${payload.user_unique_id} saved.`, 'success');
+    document.getElementById('policy-form-card').style.display = 'none';
+    loadPolicyHolders();
+  });
+
+  // ── Settle Claim Button
+  document.getElementById('action-settle-btn').addEventListener('click', async () => {
+    if (!currentActionClaim) return;
+    const btn = document.getElementById('action-settle-btn');
+    setButtonLoading(btn, true, 'Settling…');
+    const { ok } = await Admin.settleClaim(currentActionClaim.claim_id);
+    setButtonLoading(btn, false);
+    if (ok) {
+      showToast('Claim Settled', currentActionClaim.claim_id, 'success');
+      document.getElementById('claim-action-modal').classList.add('hidden');
+      await loadAllClaims(claimsPage);
+    } else {
+      showToast('Error', 'Settlement failed.', 'error');
+    }
+  });
+
+  // ── Download Report
+  window.downloadReport = async function(claimId) {
+    showToast('Generating Report', 'Please wait…', 'info', 3000);
+    const { ok, data, isBlob } = await Reports.downloadReport(claimId);
+    if (!ok || !isBlob) { showToast('Error', 'Could not generate report.', 'error'); return; }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${claimId}_NexSettle_Report.pdf`; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Downloaded!', `${claimId} report is ready.`, 'success');
+  };
+
+  // ── Mobile menu
+  document.getElementById('mobile-menu-btn').addEventListener('click', () =>
+    document.getElementById('sidebar').classList.toggle('open'));
+
+  // ── Init
+  navigate('dashboard');
+</script>
+</body>
+</html>

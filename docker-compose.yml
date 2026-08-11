@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  # ── MongoDB ─────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: nexsettle_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - nexsettle_net
+    environment:
+      MONGO_INITDB_DATABASE: nexsettle_db
+
+  # ── NexSettle Django Backend ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexsettle_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./backend/media:/app/media
+    networks:
+      - nexsettle_net
+    depends_on:
+      - mongo
+    environment:
+      - DJANGO_SETTINGS_MODULE=nexsettle.settings
+      - DEBUG=True
+      - SECRET_KEY=nexsettle-docker-secret-change-in-production
+      - MONGO_URI=mongodb://mongo:27017/
+      - MONGO_DB_NAME=nexsettle_db
+      - JWT_SECRET=nexsettle-docker-jwt-secret
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-your-gemini-api-key-here}
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - TESSERACT_CMD=/usr/bin/tesseract
+      - ALLOWED_HOSTS=*
+      - CSRF_TRUSTED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  nexsettle_net:
+    driver: bridge
