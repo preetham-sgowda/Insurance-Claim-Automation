@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-terracotta: #B77466;
+    --color-cream: #FFE1AF;
+    --color-sand: #E2B59A;
+    --color-brown: #957C62;
+    --color-canvas: #FAF7F2;
+  }
+
+  body {
+    background-color: #FAF7F2;
+    color: #2C221E;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+}
+
+/* Custom Palette Utility Classes */
+.bg-terracotta { background-color: #B77466; }
+.bg-terracotta-hover:hover { background-color: #A36254; }
+.text-terracotta { color: #B77466; }
+.border-terracotta { border-color: #B77466; }
+
+.bg-cream { background-color: #FFE1AF; }
+.text-cream-dark { color: #8F6218; }
+.border-cream { border-color: #FFE1AF; }
+
+.bg-sand { background-color: #E2B59A; }
+.text-sand { color: #E2B59A; }
+.border-sand { border-color: #E2B59A; }
+
+.bg-earthbrown { background-color: #957C62; }
+.text-earthbrown { color: #957C62; }
+.border-earthbrown { border-color: #957C62; }
+
+/* Custom light theme scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF7F2;
+}
+::-webkit-scrollbar-thumb {
+  background: #E2B59A;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B77466;
+}

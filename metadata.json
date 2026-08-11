@@ -1,0 +1,6 @@
+{
+  "name": "ClaimX",
+  "description": "Multi-Line Insurance Claims Automation Platform with AI document extraction, type-specific fraud detection, estimation strategy, and multi-role settlement workflow.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
